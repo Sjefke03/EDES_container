@@ -25,6 +25,13 @@ julia runnable/universal/edes_universal_runner.jl [flags]
   - Select scenario: cgm | ogtt3 | ogtt4
   - Default is cgm.
 
+- -data FILE
+  - Load custom data from JSON file instead of using default scenario data.
+  - JSON must contain "time", "glucose" arrays.
+  - "insulin" array is optional for cgm (uses fasting_insulin if not provided).
+  - "insulin" array is required for ogtt3 and ogtt4.
+  - All values must be finite numbers.
+
 - -params CSV
   - Use predefined parameters and skip optimization.
   - CSV must match scenario parameter format.
@@ -45,6 +52,33 @@ julia runnable/universal/edes_universal_runner.jl [flags]
 - cgm: k1,k5,k6,sigma_g,sigma_i
 - ogtt3: k1,k5,k6,sigma_g,sigma_i
 - ogtt4: k1,k5,k6,k8,sigma_g,sigma_i
+
+## Parameter Fitting with OGTT Data
+
+When **no `-params` flag** is provided, the script automatically runs **parameter optimization** against the measurement data:
+
+### How OGTT Fitting Works
+
+**OGTT3 and OGTT4 scenarios** fit parameters to both glucose AND insulin measurements:
+- Script loads your OGTT measurement data (glucose points + insulin points at sample times)
+- Runs optimization using Latin Hypercube sampling to generate initial parameter guesses
+- Each optimization run simulates the ODE model and compares predictions to your measured data
+- Computes loss based on both glucose and insulin residuals
+- Returns parameters that best fit your experimental measurements
+
+**CGM scenario** fits to glucose measurements only (insulin is constant fasting level)
+
+### Example: OGTT3 Parameter Fitting
+
+```bash
+# Fit parameters to your OGTT3 patient data
+julia runnable/universal/edes_universal_runner.jl -scenario ogtt3 -data patient_data.json -json fit_results.json -image fit_curves.png
+```
+
+Output shows:
+- Measurement data plotted as red dots
+- Simulated curves (blue line) fitted to your data
+- JSON file with fitted parameter values
 
 ## Example Commands
 
@@ -71,6 +105,38 @@ OGTT4 with predefined params and custom image name:
 ```bash
 julia runnable/universal/edes_universal_runner.jl -scenario ogtt4 -params 0.01,0.05,3.0,7.5,0.5,0.3 -image ogtt4_curves.png
 ```
+
+CGM with custom data from JSON and predefined params:
+
+```bash
+julia runnable/universal/edes_universal_runner.jl -scenario cgm -data mydata.json -params 0.01,0.05,3.0,0.5,0.3 -json -image
+```
+
+OGTT3 with custom data and optimization:
+
+```bash
+julia runnable/universal/edes_universal_runner.jl -scenario ogtt3 -data patient_ogtt3.json -json ogtt3_fit.json
+```
+
+## JSON Data Format
+
+Custom data files should follow this structure:
+
+```json
+{
+  "scenario": "cgm",
+  "time": [0, 5, 10, 15, 20, 25,...],
+  "glucose": [6.1, 6.2, 6.4, 6.7, 7.1, 7.6,...],
+  "insulin": [7.9, 7.9, 7.9, ...],
+  "fasting_insulin": 7.9
+}
+```
+
+- `scenario`: Optional. Can be used to auto-detect scenario type.
+- `time`: Required. Time points in minutes.
+- `glucose`: Required. Glucose measurements in mmol/L.
+- `insulin`: Optional for CGM, required for OGTT3/OGTT4. Insulin in mU/L.
+- `fasting_insulin`: Optional. Used for CGM if insulin array not provided (default: 7.9).
 
 OGTT4 optimization with both outputs:
 

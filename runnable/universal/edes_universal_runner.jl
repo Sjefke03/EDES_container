@@ -5,6 +5,7 @@
 import Pkg; Pkg.activate(joinpath(@__DIR__, "..", "..")); Pkg.resolve(); Pkg.instantiate()
 using OrdinaryDiffEq, CairoMakie, QuasiMonteCarlo
 using Optimization, OptimizationOptimJL, JSON
+using DelimitedFiles
 import OptimizationOptimJL: LBFGS
 
 # -----------------------------------------------------------------------------
@@ -33,13 +34,17 @@ sigma = 1.4
 # Scenario data
 # -----------------------------------------------------------------------------
 
-function build_scenario_data(scenario::String)
+function build_scenario_data(scenario::String, custom_data::Union{Nothing, Matrix{Float64}} = nothing)
     if scenario == "cgm"
-        cgm_time = [0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125]
-        cgm_glu = [6.1 6.2 6.4 6.7 7.1 7.6 8.1 8.5 8.9 9.2 9.4 9.5 9.6 9.6 9.5 9.4 9.3 9.2 9.0 8.9 8.8 8.6 8.5 8.3 8.2 7.9]
-        fasting_ins = 7.9
-        cgm_ins = [fasting_ins zeros(1, length(cgm_time) - 1)]
-        data = [cgm_time; cgm_glu; cgm_ins]
+        if custom_data === nothing
+            cgm_time = [0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125]
+            cgm_glu = [6.1 6.2 6.4 6.7 7.1 7.6 8.1 8.5 8.9 9.2 9.4 9.5 9.6 9.6 9.5 9.4 9.3 9.2 9.0 8.9 8.8 8.6 8.5 8.3 8.2 7.9]
+            fasting_ins = 7.9
+            cgm_ins = [fasting_ins zeros(1, length(cgm_time) - 1)]
+            data = [cgm_time; cgm_glu; cgm_ins]
+        else
+            data = custom_data
+        end
 
         return Dict(
             "scenario" => "cgm",
@@ -57,10 +62,14 @@ function build_scenario_data(scenario::String)
             "n_initial_guesses" => 200,
         )
     elseif scenario == "ogtt3"
-        data_time = [0 15 30 45 60 90 120]
-        data_glu = [5.4 7.1 8.6 8.9 8.5 7.6 6.6]
-        data_ins = [7.9 36.7 64.8 75.6 79.6 80.5 68.7]
-        data = [data_time; data_glu; data_ins]
+        if custom_data === nothing
+            data_time = [0 15 30 45 60 90 120]
+            data_glu = [5.4 7.1 8.6 8.9 8.5 7.6 6.6]
+            data_ins = [7.9 36.7 64.8 75.6 79.6 80.5 68.7]
+            data = [data_time; data_glu; data_ins]
+        else
+            data = custom_data
+        end
 
         return Dict(
             "scenario" => "ogtt3",
@@ -78,10 +87,14 @@ function build_scenario_data(scenario::String)
             "n_initial_guesses" => 300,
         )
     elseif scenario == "ogtt4"
-        data_time = [0 15 30 45 60 90 120]
-        data_glu = [5.4 7.1 8.6 8.9 8.5 7.6 6.6]
-        data_ins = [7.9 36.7 64.8 75.6 79.6 80.5 68.7]
-        data = [data_time; data_glu; data_ins]
+        if custom_data === nothing
+            data_time = [0 15 30 45 60 90 120]
+            data_glu = [5.4 7.1 8.6 8.9 8.5 7.6 6.6]
+            data_ins = [7.9 36.7 64.8 75.6 79.6 80.5 68.7]
+            data = [data_time; data_glu; data_ins]
+        else
+            data = custom_data
+        end
 
         return Dict(
             "scenario" => "ogtt4",
@@ -113,6 +126,7 @@ function print_usage()
     println("Flags:")
     println("  -h, --help                 Show help")
     println("  -scenario NAME             Scenario: cgm | ogtt3 | ogtt4 (default: cgm)")
+    println("  -data FILE                 Load real data from JSON file")
     println("  -params CSV                Predefined parameters (scenario-specific)")
     println("  -json [filename]           Save JSON output (default: results_<scenario>.json)")
     println("  -image [filename]          Save figure PNG (default: fig_<scenario>_curves.png)")
@@ -122,10 +136,18 @@ function print_usage()
     println("  ogtt3 : k1,k5,k6,sigma_g,sigma_i")
     println("  ogtt4 : k1,k5,k6,k8,sigma_g,sigma_i")
     println()
+    println("Data file format (JSON):")
+    println("  {")
+    println("    \"time\": [...],")
+    println("    \"glucose\": [...],")
+    println("    \"insulin\": [...]")
+    println("  }")
+    println()
     println("Examples:")
     println("  julia runnable/universal/edes_universal_runner.jl -scenario cgm -json -image")
     println("  julia runnable/universal/edes_universal_runner.jl -scenario ogtt3 -params 0.01,0.05,3.0,0.5,0.3 -json ogtt3.json")
     println("  julia runnable/universal/edes_universal_runner.jl -scenario ogtt4 -params 0.01,0.05,3.0,7.5,0.5,0.3 -image ogtt4.png")
+    println("  julia runnable/universal/edes_universal_runner.jl -scenario cgm -data mydata.json -json")
 end
 
 function parse_params_csv(text::String)
@@ -139,6 +161,57 @@ function parse_params_csv(text::String)
     return vals
 end
 
+function load_data_json(filepath::String, scenario_hint::String)
+    """Load real data from JSON file.
+    
+    Expected format:
+    {
+      "scenario": "cgm",  (optional, can override command line)
+      "time": [...],
+      "glucose": [...],
+      "insulin": [...]    (required for ogtt scenarios, optional for cgm)
+    }
+    """
+    !isfile(filepath) && error("Data file not found: $filepath")
+    
+    content = JSON.parsefile(filepath)
+    
+    # Validate required fields
+    haskey(content, "time") || error("JSON data must contain 'time' array")
+    haskey(content, "glucose") || error("JSON data must contain 'glucose' array")
+    
+    time_data = vec(content["time"])
+    glucose_data = vec(content["glucose"])
+    
+    # Insulin is optional for CGM, but required for OGTT
+    if scenario_hint in ["ogtt3", "ogtt4"]
+        haskey(content, "insulin") || error("Scenario '$scenario_hint' requires 'insulin' array in JSON")
+        insulin_data = vec(content["insulin"])
+    else
+        # For CGM, use fasting insulin if not provided
+        insulin_data = get(content, "insulin", nothing)
+        if insulin_data === nothing
+            fasting_ins = get(content, "fasting_insulin", 7.9)
+            insulin_data = [fasting_ins; zeros(length(time_data) - 1)]
+        else
+            insulin_data = vec(insulin_data)
+        end
+    end
+    
+    # Validate sizes
+    length(time_data) == length(glucose_data) || error("time and glucose arrays must have equal length")
+    length(time_data) == length(insulin_data) || error("time and insulin arrays must have equal length")
+    length(time_data) >= 3 || error("Must have at least 3 data points")
+    
+    # Check for valid values
+    all(isfinite, time_data) || error("time contains non-finite values")
+    all(isfinite, glucose_data) || error("glucose contains non-finite values")
+    all(isfinite, insulin_data) || error("insulin contains non-finite values")
+    
+    # Return as matrix compatible with build_scenario_data format
+    return convert(Matrix{Float64}, [time_data'; glucose_data'; insulin_data'])
+end
+
 function resolve_output_path(out_dir::String, filename::String)
     return isabspath(filename) ? filename : joinpath(out_dir, filename)
 end
@@ -146,6 +219,7 @@ end
 function parse_cli(args::Vector{String})
     scenario = "cgm"
     predefined_params = nothing
+    data_file = nothing
     emit_json = false
     emit_image = false
     json_filename = ""
@@ -160,6 +234,10 @@ function parse_cli(args::Vector{String})
         elseif arg == "-scenario"
             i < length(args) || error("Missing value after -scenario")
             scenario = lowercase(strip(args[i + 1]))
+            i += 2
+        elseif arg == "-data"
+            i < length(args) || error("Missing value after -data")
+            data_file = args[i + 1]
             i += 2
         elseif arg == "-params"
             i < length(args) || error("Missing value after -params")
@@ -188,6 +266,7 @@ function parse_cli(args::Vector{String})
 
     return (;
         scenario = scenario,
+        data_file = data_file,
         predefined_params = predefined_params,
         emit_json = emit_json,
         emit_image = emit_image,
@@ -320,9 +399,28 @@ end
 # -----------------------------------------------------------------------------
 
 cli = parse_cli(ARGS)
-cfg = build_scenario_data(cli.scenario)
+
+# Load custom data if provided
+custom_data = nothing
+if cli.data_file !== nothing
+    println("[INFO] Loading data from: $(cli.data_file)")
+    custom_data = load_data_json(cli.data_file, cli.scenario)
+    println("[INFO] Data loaded successfully: $(size(custom_data)) matrix")
+end
+
+cfg = build_scenario_data(cli.scenario, custom_data)
 constants = build_constants(cfg)
 data = cfg["data"]
+
+# Log measurement data being used
+println("[INFO] Measurement data for fitting:")
+println("[INFO]   Timepoints: $(data[1, :])")
+println("[INFO]   Glucose data ($(size(data, 2)) points): $(data[2, :])")
+if cfg["uses_insulin_data"]
+    println("[INFO]   Insulin data ($(size(data, 2)) points): $(data[3, :])")
+else
+    println("[INFO]   Insulin: Fixed at fasting level")
+end
 
 if cli.predefined_params !== nothing
     validate_params!(cli.predefined_params, cfg)
@@ -331,7 +429,12 @@ end
 prob = ODEProblem(edesode!, [0.0, cfg["Gb"], cfg["Ib"], 0.0], (0.0, 240.0), constants)
 
 if cli.predefined_params === nothing
-    println("[INFO] Scenario=$(cfg["scenario"]) with no -params. Running optimization.")
+    println("[INFO] Scenario=$(cfg["scenario"]) with no -params. Running optimization with measurement data.")
+    if cfg["uses_insulin_data"]
+        println("[INFO] Fitting to both glucose and insulin measurements")
+    else
+        println("[INFO] Fitting to glucose measurements only")
+    end
 
     lhs = LatinHypercubeSample()
     initial_guess = QuasiMonteCarlo.sample(cfg["n_initial_guesses"], cfg["lb"], cfg["ub"], lhs)
