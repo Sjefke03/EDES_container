@@ -5,8 +5,9 @@
 import Pkg; Pkg.activate(joinpath(@__DIR__, "..", "..")); Pkg.resolve(); Pkg.instantiate()
 using OrdinaryDiffEq, CairoMakie, QuasiMonteCarlo
 using Optimization, OptimizationOptimJL, JSON
+using Optimization: AutoForwardDiff
 using DelimitedFiles
-import OptimizationOptimJL: LBFGS
+import OptimizationOptimJL: LBFGS, NelderMead
 
 # -----------------------------------------------------------------------------
 # Shared physiology constants
@@ -55,8 +56,8 @@ function build_scenario_data(scenario::String, custom_data::Union{Nothing, Matri
             "k8_fixed" => 7.25,
             "param_names" => ["k1", "k5", "k6", "sigma_g", "sigma_i"],
             "model_param_count" => 3,
-            "lb" => [1e-6, 1e-6, 1e-6, 1e-4, 1e-4],
-            "ub" => [1.0, 0.5, 10.0, 100.0, 100.0],
+            "lb" => [0.001, 0.001, 0.5, 0.01, 0.1],
+            "ub" => [0.1, 0.15, 5.0, 2.0, 50.0],
             "save_idxs" => [2],
             "uses_insulin_data" => false,
             "n_initial_guesses" => 200,
@@ -80,8 +81,8 @@ function build_scenario_data(scenario::String, custom_data::Union{Nothing, Matri
             "k8_fixed" => 7.25,
             "param_names" => ["k1", "k5", "k6", "sigma_g", "sigma_i"],
             "model_param_count" => 3,
-            "lb" => [1e-6, 1e-6, 1e-6, 1e-4, 1e-4],
-            "ub" => [1.0, 0.5, 10.0, 100.0, 100.0],
+            "lb" => [0.001, 0.001, 0.5, 0.01, 0.1],
+            "ub" => [0.1, 0.15, 5.0, 2.0, 50.0],
             "save_idxs" => [2, 3],
             "uses_insulin_data" => true,
             "n_initial_guesses" => 300,
@@ -105,8 +106,8 @@ function build_scenario_data(scenario::String, custom_data::Union{Nothing, Matri
             "k8_fixed" => 7.25,
             "param_names" => ["k1", "k5", "k6", "k8", "sigma_g", "sigma_i"],
             "model_param_count" => 4,
-            "lb" => [1e-6, 1e-6, 1e-6, 1e-6, 1e-4, 1e-4],
-            "ub" => [1.0, 0.5, 10.0, 25.0, 100.0, 100.0],
+            "lb" => [0.001, 0.001, 0.5, 0.1, 0.01, 0.1],
+            "ub" => [0.1, 0.15, 5.0, 25.0, 2.0, 50.0],
             "save_idxs" => [2, 3],
             "uses_insulin_data" => true,
             "n_initial_guesses" => 300,
@@ -293,9 +294,36 @@ end
 # Model and loss
 # -----------------------------------------------------------------------------
 
-function build_constants(cfg::Dict)
+function build_dummy_params(cfg::Dict)
+    """Build a dummy parameter vector for ODE problem initialization.
+    Includes placeholder values for estimated parameters k1, k5, k6, k8."""
+    
+    bw = 70.0
+    Dmeal = 75.0e3
+    k2 = 0.28
+    k3 = 6.07e-3
+    k4 = 2.35e-4
+    k7 = 1.15
+    k9 = 3.83e-2
+    k10 = 2.84e-1
+    tau_i = 31.0
+    tau_d = 3.0
+    beta = 1.0
+    Gren = 9.0
+    EGPb = 0.043
+    Km = 13.2
+    f = 0.005551
+    c1 = 0.1
+    sigma = 1.4
     Vg = 17.0 / bw
-    return [k2, k3, k4, k7, k9, k10, tau_i, tau_d, beta, Gren, EGPb, Km, f, Vg, c1, sigma, Dmeal, bw, cfg["Gb"], cfg["Ib"]]
+    
+    if cfg["k8_mode"] == :fixed
+        k1, k5, k6, k8 = 0.01, 0.05, 3.0, cfg["k8_fixed"]
+    else
+        k1, k5, k6, k8 = 0.01, 0.05, 3.0, 7.27
+    end
+    
+    return [k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, tau_i, tau_d, beta, Gren, EGPb, Km, f, Vg, c1, sigma, Dmeal, bw, cfg["Gb"], cfg["Ib"]]
 end
 
 function edesode!(du, u, p, t)
@@ -318,7 +346,7 @@ function edesode!(du, u, p, t)
     du[4] = i_int - k10v * Irem
 end
 
-function construct_parameters(theta::Vector{Float64}, constants::Vector{Float64}, cfg::Dict)
+function construct_parameters(theta, constants, cfg)
     if cfg["k8_mode"] == :fixed
         k1v = theta[1]
         k5v = theta[2]
@@ -340,19 +368,21 @@ function construct_parameters(theta::Vector{Float64}, constants::Vector{Float64}
     return [k1v, k2v, k3v, k4v, k5v, k6v, k7v, k8v, k9v, k10v, tau_iv, tau_dv, betav, Grenv, EGPbv, Kmv, fv, Vgv, c1v, sigmav, Dmealv, bwv, Gbv, Ibv]
 end
 
-penalty_l2_weight = 1e4
-penalty_offset = 1e6
-loss_scaling = 0.5
 ode_solver = Tsit5()
 
-function loss_universal(theta::Vector{Float64}, payload)
+function loss_universal(theta, payload)
     problem, constants, data, cfg = payload
 
     glucose_data = data[2, :]
     insulin_data = data[3, :]
     data_timepoints = data[1, :]
 
-    penalty = sum(abs2, theta[1:cfg["model_param_count"]]) * penalty_l2_weight + penalty_offset
+    # Check parameter bounds and return large penalty if violated
+    for (i, val) in enumerate(theta)
+        if val < cfg["lb"][i] || val > cfg["ub"][i]
+            return 1e10  # Large penalty for out-of-bounds
+        end
+    end
 
     p = construct_parameters(theta, constants, cfg)
     local pred
@@ -360,37 +390,43 @@ function loss_universal(theta::Vector{Float64}, payload)
         pred = solve(problem, ode_solver, p = p, saveat = data_timepoints, save_idxs = cfg["save_idxs"],
                      u0 = [0.0, data[2, 1], data[3, 1], 0.0])
     catch
-        return penalty
+        return 1e10
     end
 
     if cfg["uses_insulin_data"]
         sol = Array(pred)
-        size(sol, 2) == length(glucose_data) || return penalty
+        size(sol, 2) != length(glucose_data) && return 1e10
 
+        # Normalize residuals by maximum data values (as in notebook)
         g_loss = (sol[1, :] - glucose_data) / maximum(glucose_data)
         i_loss = (sol[2, :] - insulin_data) / maximum(insulin_data)
-        any(!isfinite, g_loss) && return penalty
-        any(!isfinite, i_loss) && return penalty
+        any(!isfinite, g_loss) && return 1e10
+        any(!isfinite, i_loss) && return 1e10
 
         n = length(glucose_data)
         sigma_g = theta[end - 1]
         sigma_i = theta[end]
-        L_g = n * log(sigma_g * sqrt(2 * pi)) + (1 / (2 * sigma_g^2)) * sum(abs2, g_loss)
-        L_i = n * log(sigma_i * sqrt(2 * pi)) + (1 / (2 * sigma_i^2)) * sum(abs2, i_loss)
-        (isfinite(L_g) && isfinite(L_i)) || return penalty
-        return loss_scaling * L_g + loss_scaling * L_i
+        
+        # Negative log-likelihood for normal distribution (matching notebook)
+        L_g = n * log(sigma_g * sqrt(2π)) + 1 / (2 * sigma_g^2) * sum(abs2, g_loss)
+        L_i = n * log(sigma_i * sqrt(2π)) + 1 / (2 * sigma_i^2) * sum(abs2, i_loss)
+        (isfinite(L_g) && isfinite(L_i)) || return 1e10
+        return 0.5 * L_g + 0.5 * L_i
     else
         sol = vec(Array(pred))
-        length(sol) == length(glucose_data) || return penalty
+        length(sol) == length(glucose_data) || return 1e10
 
+        # Normalize residuals by maximum glucose data (as in notebook)
         g_loss = (sol - glucose_data) / maximum(glucose_data)
-        any(!isfinite, g_loss) && return penalty
+        any(!isfinite, g_loss) && return 1e10
 
         n = length(glucose_data)
         sigma_g = theta[end - 1]
-        L_g = n * log(sigma_g * sqrt(2 * pi)) + (1 / (2 * sigma_g^2)) * sum(abs2, g_loss)
-        isfinite(L_g) || return penalty
-        return loss_scaling * L_g
+        
+        # Negative log-likelihood for normal distribution (matching notebook)
+        L_g = n * log(sigma_g * sqrt(2π)) + 1 / (2 * sigma_g^2) * sum(abs2, g_loss)
+        isfinite(L_g) || return 1e10
+        return L_g
     end
 end
 
@@ -409,8 +445,12 @@ if cli.data_file !== nothing
 end
 
 cfg = build_scenario_data(cli.scenario, custom_data)
-constants = build_constants(cfg)
 data = cfg["data"]
+
+# Build full parameter vector for ODE problem (with dummy values for estimated params)
+Vg = 17.0 / bw
+constants = [k2, k3, k4, k7, k9, k10, tau_i, tau_d, beta, Gren, EGPb, Km, f, Vg, c1, sigma, Dmeal, bw, cfg["Gb"], cfg["Ib"]]
+dummy_params = build_dummy_params(cfg)
 
 # Log measurement data being used
 println("[INFO] Measurement data for fitting:")
@@ -426,7 +466,7 @@ if cli.predefined_params !== nothing
     validate_params!(cli.predefined_params, cfg)
 end
 
-prob = ODEProblem(edesode!, [0.0, cfg["Gb"], cfg["Ib"], 0.0], (0.0, 240.0), constants)
+prob = ODEProblem(edesode!, [0.0, cfg["Gb"], cfg["Ib"], 0.0], (0.0, 240.0), dummy_params)
 
 if cli.predefined_params === nothing
     println("[INFO] Scenario=$(cfg["scenario"]) with no -params. Running optimization with measurement data.")
@@ -441,6 +481,7 @@ if cli.predefined_params === nothing
 
     optf = OptimizationFunction(loss_universal, AutoForwardDiff())
     results = Any[]
+    local failed_count = 0
 
     for (idx, guess) in enumerate(eachcol(initial_guess))
         if idx == 1 || idx % 25 == 0
@@ -448,16 +489,30 @@ if cli.predefined_params === nothing
         end
         try
             res = solve(OptimizationProblem(optf, Vector(guess), (prob, constants, data, cfg), lb = cfg["lb"], ub = cfg["ub"]), LBFGS())
-            push!(results, res)
-        catch
-            continue
+            if isfinite(res.objective)
+                push!(results, res)
+                if idx == 1
+                    println("[DEBUG] First run succeeded with objective=$(res.objective)")
+                end
+            else
+                failed_count += 1
+                if idx == 1
+                    println("[DEBUG] First run returned non-finite objective=$(res.objective)")
+                end
+            end
+        catch e
+            failed_count += 1
+            if idx == 1
+                println("[DEBUG] First run threw error: $(e)")
+            end
         end
     end
 
+    println("[INFO] Optimization complete. Successful runs=$(length(results))/$(cfg["n_initial_guesses"])")
     isempty(results) && error("All optimization runs failed for scenario $(cfg["scenario"]).")
+    
     best_idx = argmin([r.objective for r in results])
     final_params = results[best_idx].u
-    println("[OK] Optimization complete. Successful runs=$(length(results))/$(cfg["n_initial_guesses"]).")
     println("[OK] Best objective=$(results[best_idx].objective)")
 else
     final_params = cli.predefined_params
