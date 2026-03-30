@@ -1,0 +1,14 @@
+.git
+.gitignore
+Manifest.toml
+Project.toml
+**/.DS_Store
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.ipynb_checkpoints/
+runnable/universal/*.png
+runnable/universal/*_out.json
+runnable/universal/results_test.json
+runnable/universal/debug_loss.jl

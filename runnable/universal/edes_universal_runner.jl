@@ -2,7 +2,8 @@
 # Universal EDES runner for: cgm, ogtt3, ogtt4
 # Run from repo root: julia runnable/universal/edes_universal_runner.jl [flags]
 
-import Pkg; Pkg.activate(joinpath(@__DIR__, "..", "..")); Pkg.resolve(); Pkg.instantiate()
+project_dir = get(ENV, "EDES_PROJECT_DIR", joinpath(@__DIR__, "..", ".."))
+import Pkg; Pkg.activate(project_dir); Pkg.resolve(); Pkg.instantiate()
 using OrdinaryDiffEq, CairoMakie, QuasiMonteCarlo
 using Optimization, OptimizationOptimJL, JSON
 using Optimization: AutoForwardDiff
@@ -491,20 +492,11 @@ if cli.predefined_params === nothing
             res = solve(OptimizationProblem(optf, Vector(guess), (prob, constants, data, cfg), lb = cfg["lb"], ub = cfg["ub"]), LBFGS())
             if isfinite(res.objective)
                 push!(results, res)
-                if idx == 1
-                    println("[DEBUG] First run succeeded with objective=$(res.objective)")
-                end
             else
                 failed_count += 1
-                if idx == 1
-                    println("[DEBUG] First run returned non-finite objective=$(res.objective)")
-                end
             end
-        catch e
+        catch
             failed_count += 1
-            if idx == 1
-                println("[DEBUG] First run threw error: $(e)")
-            end
         end
     end
 
@@ -529,7 +521,8 @@ solution = solve(prob, ode_solver, p = construct_parameters(final_params, consta
                  u0 = [0.0, data[2, 1], data[3, 1], 0.0])
 println("[OK] Simulation complete for $(length(solution.t)) time points")
 
-output_dir = @__DIR__
+# In containers this can be set to a mounted directory like /io.
+output_dir = get(ENV, "EDES_OUTPUT_DIR", @__DIR__)
 default_json_name = "results_$(cfg["scenario"]).json"
 default_image_name = "fig_$(cfg["scenario"])_curves.png"
 

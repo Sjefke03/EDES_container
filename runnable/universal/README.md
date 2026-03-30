@@ -16,6 +16,27 @@ Run from repo root:
 julia runnable/universal/edes_universal_runner.jl [flags]
 ```
 
+## Docker One-Shot Usage
+
+Build image from repository root:
+
+```bash
+docker build -t edes-universal:latest .
+```
+
+Run as one-shot container with mounted input/output folder:
+
+```bash
+docker run --rm -v "${PWD}/runnable/universal:/io" edes-universal:latest -scenario cgm -data /io/test_data_cgm.json -json cgm_out.json -image cgm_out.png
+```
+
+Notes:
+
+- The container entrypoint is the universal runner script.
+- `/io` is the working directory in the container.
+- Relative `-json` and `-image` outputs are written to `/io` (mounted host folder).
+- You can also pass absolute output paths.
+
 ## Flags
 
 - -h, --help
