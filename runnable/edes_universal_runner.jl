@@ -2,11 +2,15 @@
 # Universal EDES runner for: cgm, ogtt3, ogtt4
 # Run from repo root: julia runnable/universal/edes_universal_runner.jl [flags]
 
-project_dir = get(ENV, "EDES_PROJECT_DIR", joinpath(@__DIR__, "..", ".."))
-import Pkg; Pkg.activate(project_dir); Pkg.resolve(); Pkg.instantiate()
+project_dir = get(ENV, "EDES_PROJECT_DIR", @__DIR__)
+import Pkg; Pkg.activate(project_dir)
+
+if get(ENV, "EDES_AUTO_PKG", "1") == "1"
+    Pkg.resolve()
+    Pkg.instantiate()
+end
 using OrdinaryDiffEq, CairoMakie, QuasiMonteCarlo
 using Optimization, OptimizationOptimJL, JSON
-using Optimization: AutoForwardDiff
 using DelimitedFiles
 import OptimizationOptimJL: LBFGS, NelderMead
 
@@ -111,7 +115,7 @@ function build_scenario_data(scenario::String, custom_data::Union{Nothing, Matri
             "ub" => [0.1, 0.15, 5.0, 25.0, 2.0, 50.0],
             "save_idxs" => [2, 3],
             "uses_insulin_data" => true,
-            "n_initial_guesses" => 300,
+            "n_initial_guesses" => 1000,
         )
     else
         error("Unknown scenario '$scenario'. Use one of: cgm, ogtt3, ogtt4")
@@ -295,36 +299,9 @@ end
 # Model and loss
 # -----------------------------------------------------------------------------
 
-function build_dummy_params(cfg::Dict)
-    """Build a dummy parameter vector for ODE problem initialization.
-    Includes placeholder values for estimated parameters k1, k5, k6, k8."""
-    
-    bw = 70.0
-    Dmeal = 75.0e3
-    k2 = 0.28
-    k3 = 6.07e-3
-    k4 = 2.35e-4
-    k7 = 1.15
-    k9 = 3.83e-2
-    k10 = 2.84e-1
-    tau_i = 31.0
-    tau_d = 3.0
-    beta = 1.0
-    Gren = 9.0
-    EGPb = 0.043
-    Km = 13.2
-    f = 0.005551
-    c1 = 0.1
-    sigma = 1.4
+function build_constants(cfg::Dict)
     Vg = 17.0 / bw
-    
-    if cfg["k8_mode"] == :fixed
-        k1, k5, k6, k8 = 0.01, 0.05, 3.0, cfg["k8_fixed"]
-    else
-        k1, k5, k6, k8 = 0.01, 0.05, 3.0, 7.27
-    end
-    
-    return [k1, k2, k3, k4, k5, k6, k7, k8, k9, k10, tau_i, tau_d, beta, Gren, EGPb, Km, f, Vg, c1, sigma, Dmeal, bw, cfg["Gb"], cfg["Ib"]]
+    return [k2, k3, k4, k7, k9, k10, tau_i, tau_d, beta, Gren, EGPb, Km, f, Vg, c1, sigma, Dmeal, bw, cfg["Gb"], cfg["Ib"]]
 end
 
 function edesode!(du, u, p, t)
@@ -347,7 +324,7 @@ function edesode!(du, u, p, t)
     du[4] = i_int - k10v * Irem
 end
 
-function construct_parameters(theta, constants, cfg)
+function construct_parameters(theta::Vector{Float64}, constants::Vector{Float64}, cfg::Dict)
     if cfg["k8_mode"] == :fixed
         k1v = theta[1]
         k5v = theta[2]
@@ -371,7 +348,7 @@ end
 
 ode_solver = Tsit5()
 
-function loss_universal(theta, payload)
+function loss_universal(theta::Vector{Float64}, payload)
     problem, constants, data, cfg = payload
 
     glucose_data = data[2, :]
@@ -398,34 +375,34 @@ function loss_universal(theta, payload)
         sol = Array(pred)
         size(sol, 2) != length(glucose_data) && return 1e10
 
-        # Normalize residuals by maximum data values (as in notebook)
-        g_loss = (sol[1, :] - glucose_data) / maximum(glucose_data)
-        i_loss = (sol[2, :] - insulin_data) / maximum(insulin_data)
-        any(!isfinite, g_loss) && return 1e10
-        any(!isfinite, i_loss) && return 1e10
+        # Raw residuals (no normalization for likelihood)
+        g_resid = sol[1, :] - glucose_data
+        i_resid = sol[2, :] - insulin_data
+        any(!isfinite, g_resid) && return 1e10
+        any(!isfinite, i_resid) && return 1e10
 
         n = length(glucose_data)
         sigma_g = theta[end - 1]
         sigma_i = theta[end]
         
-        # Negative log-likelihood for normal distribution (matching notebook)
-        L_g = n * log(sigma_g * sqrt(2π)) + 1 / (2 * sigma_g^2) * sum(abs2, g_loss)
-        L_i = n * log(sigma_i * sqrt(2π)) + 1 / (2 * sigma_i^2) * sum(abs2, i_loss)
+        # Proper negative log-likelihood for normal distribution
+        L_g = n * log(sigma_g) + sum(abs2, g_resid) / (2 * sigma_g^2)
+        L_i = n * log(sigma_i) + sum(abs2, i_resid) / (2 * sigma_i^2)
         (isfinite(L_g) && isfinite(L_i)) || return 1e10
-        return 0.5 * L_g + 0.5 * L_i
+        return L_g + L_i
     else
         sol = vec(Array(pred))
         length(sol) == length(glucose_data) || return 1e10
 
-        # Normalize residuals by maximum glucose data (as in notebook)
-        g_loss = (sol - glucose_data) / maximum(glucose_data)
-        any(!isfinite, g_loss) && return 1e10
+        # Raw residuals (no normalization for likelihood)
+        g_resid = sol - glucose_data
+        any(!isfinite, g_resid) && return 1e10
 
         n = length(glucose_data)
         sigma_g = theta[end - 1]
         
-        # Negative log-likelihood for normal distribution (matching notebook)
-        L_g = n * log(sigma_g * sqrt(2π)) + 1 / (2 * sigma_g^2) * sum(abs2, g_loss)
+        # Proper negative log-likelihood for normal distribution
+        L_g = n * log(sigma_g) + sum(abs2, g_resid) / (2 * sigma_g^2)
         isfinite(L_g) || return 1e10
         return L_g
     end
@@ -446,12 +423,8 @@ if cli.data_file !== nothing
 end
 
 cfg = build_scenario_data(cli.scenario, custom_data)
+constants = build_constants(cfg)
 data = cfg["data"]
-
-# Build full parameter vector for ODE problem (with dummy values for estimated params)
-Vg = 17.0 / bw
-constants = [k2, k3, k4, k7, k9, k10, tau_i, tau_d, beta, Gren, EGPb, Km, f, Vg, c1, sigma, Dmeal, bw, cfg["Gb"], cfg["Ib"]]
-dummy_params = build_dummy_params(cfg)
 
 # Log measurement data being used
 println("[INFO] Measurement data for fitting:")
@@ -467,7 +440,7 @@ if cli.predefined_params !== nothing
     validate_params!(cli.predefined_params, cfg)
 end
 
-prob = ODEProblem(edesode!, [0.0, cfg["Gb"], cfg["Ib"], 0.0], (0.0, 240.0), dummy_params)
+prob = ODEProblem(edesode!, [0.0, cfg["Gb"], cfg["Ib"], 0.0], (0.0, 240.0), constants)
 
 if cli.predefined_params === nothing
     println("[INFO] Scenario=$(cfg["scenario"]) with no -params. Running optimization with measurement data.")
@@ -480,7 +453,7 @@ if cli.predefined_params === nothing
     lhs = LatinHypercubeSample()
     initial_guess = QuasiMonteCarlo.sample(cfg["n_initial_guesses"], cfg["lb"], cfg["ub"], lhs)
 
-    optf = OptimizationFunction(loss_universal, AutoForwardDiff())
+    optf = OptimizationFunction(loss_universal)
     results = Any[]
     local failed_count = 0
 
@@ -489,8 +462,8 @@ if cli.predefined_params === nothing
             println("[INFO] Optimization run $idx/$(cfg["n_initial_guesses"])")
         end
         try
-            res = solve(OptimizationProblem(optf, Vector(guess), (prob, constants, data, cfg), lb = cfg["lb"], ub = cfg["ub"]), LBFGS())
-            if isfinite(res.objective)
+            res = solve(OptimizationProblem(optf, Vector(guess), (prob, constants, data, cfg)), NelderMead())
+            if res.objective > 0 && isfinite(res.objective)
                 push!(results, res)
             else
                 failed_count += 1
@@ -521,8 +494,7 @@ solution = solve(prob, ode_solver, p = construct_parameters(final_params, consta
                  u0 = [0.0, data[2, 1], data[3, 1], 0.0])
 println("[OK] Simulation complete for $(length(solution.t)) time points")
 
-# In containers this can be set to a mounted directory like /io.
-output_dir = get(ENV, "EDES_OUTPUT_DIR", @__DIR__)
+output_dir = @__DIR__
 default_json_name = "results_$(cfg["scenario"]).json"
 default_image_name = "fig_$(cfg["scenario"])_curves.png"
 
