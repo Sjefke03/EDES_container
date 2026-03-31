@@ -27,14 +27,15 @@ docker build -t edes-universal:latest .
 Run as one-shot container with mounted input/output folder:
 
 ```bash
-docker run --rm -v "${PWD}:/io" edes-universal:latest -scenario cgm -data /io/test_data_cgm.json -json cgm_out.json -image cgm_out.png
+docker run --rm -v "${PWD}/inputs:/inputs" -v "${PWD}/outputs:/outputs" edes-universal:latest -scenario cgm -json cgm_out.json -image cgm_out.png
 ```
 
 Notes:
 
 - The container entrypoint is the universal runner script.
-- `/io` is the working directory in the container.
-- Relative `-json` and `-image` outputs are written to `/io` (mounted host folder).
+- The container reads inputs from `/inputs`.
+- The container writes outputs to `/outputs`.
+- Relative `-json` and `-image` outputs are written to `/outputs` (mounted host folder).
 - You can also pass absolute output paths.
 
 ## Flags
@@ -51,12 +52,8 @@ Notes:
   - JSON must contain "time", "glucose" arrays.
   - "insulin" array is optional for cgm (uses fasting_insulin if not provided).
   - "insulin" array is required for ogtt3 and ogtt4.
+  - Optional "parameters" field: when present, optimization is skipped.
   - All values must be finite numbers.
-
-- -params CSV
-  - Use predefined parameters and skip optimization.
-  - CSV must match scenario parameter format.
-  - Values are validated against scenario bounds.
 
 - -json [filename]
   - Enable JSON output.
@@ -76,7 +73,9 @@ Notes:
 
 ## Parameter Fitting with OGTT Data
 
-When **no `-params` flag** is provided, the script automatically runs **parameter optimization** against the measurement data:
+When the input JSON **does not include** `parameters`, the script automatically runs **parameter optimization** against the measurement data.
+
+When the input JSON **does include** `parameters`, the script validates and uses them directly, and optimization is skipped.
 
 ### How Parameter Optimization Works
 
@@ -127,22 +126,22 @@ CGM optimization with JSON and image:
 julia edes_universal_runner.jl -scenario cgm -json -image
 ```
 
-OGTT3 with predefined params and custom JSON:
+OGTT3 with pretrained params in JSON (no optimization):
 
 ```bash
-julia edes_universal_runner.jl -scenario ogtt3 -params 0.01,0.05,3.0,0.5,0.3 -json ogtt3_result.json
+julia edes_universal_runner.jl -scenario ogtt3 -data inputs/test_data_ogtt3_with_params.json -json ogtt3_result.json
 ```
 
-OGTT4 with predefined params and custom image name:
+OGTT4 optimization with custom image name:
 
 ```bash
-julia edes_universal_runner.jl -scenario ogtt4 -params 0.01,0.05,3.0,7.5,0.5,0.3 -image ogtt4_curves.png
+julia edes_universal_runner.jl -scenario ogtt4 -data inputs/test_data_ogtt4.json -image ogtt4_curves.png
 ```
 
-CGM with custom data from JSON and predefined params:
+CGM with custom data from JSON and optimization:
 
 ```bash
-julia edes_universal_runner.jl -scenario cgm -data mydata.json -params 0.01,0.05,3.0,0.5,0.3 -json -image
+julia edes_universal_runner.jl -scenario cgm -data mydata.json -json -image
 ```
 
 OGTT3 with custom data and optimization:
@@ -160,13 +159,13 @@ Run these from this folder (`runnable`).
 Without predefined parameters (optimize from test data):
 
 ```bash
-julia edes_universal_runner.jl -scenario cgm -data test_data_cgm.json -json cgm_out.json -image cgm_out.png
+julia edes_universal_runner.jl -scenario cgm -data inputs/test_data_cgm.json -json cgm_out.json -image cgm_out.png
 ```
 
-With predefined parameters (from cgm_out.json):
+With predefined parameters in JSON (no optimization):
 
 ```bash
-julia edes_universal_runner.jl -scenario cgm -data test_data_cgm.json -params 0.00880779075272941,0.00955640649315587,5.0,0.0206730458249846,25.04999999999984 -json cgm_predef_out.json -image cgm_predef_out.png
+julia edes_universal_runner.jl -scenario cgm -data inputs/test_data_cgm_with_params.json -json cgm_predef_out.json -image cgm_predef_out.png
 ```
 
 ### OGTT3
@@ -174,13 +173,13 @@ julia edes_universal_runner.jl -scenario cgm -data test_data_cgm.json -params 0.
 Without predefined parameters (optimize from test data):
 
 ```bash
-julia edes_universal_runner.jl -scenario ogtt3 -data test_data_ogtt3.json -json ogtt3_out.json -image ogtt3_out.png
+julia edes_universal_runner.jl -scenario ogtt3 -data inputs/test_data_ogtt3.json -json ogtt3_out.json -image ogtt3_out.png
 ```
 
-With predefined parameters (from ogtt3_out.json):
+With predefined parameters in JSON (estimated OGTT3 parameters):
 
 ```bash
-julia edes_universal_runner.jl -scenario ogtt3 -data test_data_ogtt3.json -params 0.015267477934545208,0.050921296545794935,1.5531234642813734,0.010000000000000002,0.20032085650634182 -json ogtt3_predef_out.json -image ogtt3_predef_out.png
+julia edes_universal_runner.jl -scenario ogtt3 -data inputs/test_data_ogtt3_with_params.json -json ogtt3_predef_out.json -image ogtt3_predef_out.png
 ```
 
 ### OGTT4
@@ -188,13 +187,13 @@ julia edes_universal_runner.jl -scenario ogtt3 -data test_data_ogtt3.json -param
 Without predefined parameters (optimize from test data):
 
 ```bash
-julia edes_universal_runner.jl -scenario ogtt4 -data test_data_ogtt4.json -json ogtt4_out.json -image ogtt4_out.png
+julia edes_universal_runner.jl -scenario ogtt4 -data inputs/test_data_ogtt4.json -json ogtt4_out.json -image ogtt4_out.png
 ```
 
-With predefined parameters (from ogtt4_out.json):
+With predefined parameters in JSON (no optimization):
 
 ```bash
-julia edes_universal_runner.jl -scenario ogtt4 -data test_data_ogtt4.json -params 0.014518160037517042,0.05188548641056432,1.5308380035708968,5.5327535782440815,0.010000000000000002,0.1697258921293979 -json ogtt4_predef_out.json -image ogtt4_predef_out.png
+julia edes_universal_runner.jl -scenario ogtt4 -data inputs/test_data_ogtt4_with_params.json -json ogtt4_predef_out.json -image ogtt4_predef_out.png
 ```
 
 ## JSON Data Format
@@ -207,7 +206,8 @@ Custom data files should follow this structure:
   "time": [0, 5, 10, 15, 20, 25,...],
   "glucose": [6.1, 6.2, 6.4, 6.7, 7.1, 7.6,...],
   "insulin": [7.9, 7.9, 7.9, ...],
-  "fasting_insulin": 7.9
+  "fasting_insulin": 7.9,
+  "parameters": [0.01, 0.05, 3.0, 0.5, 0.3]
 }
 ```
 
@@ -216,6 +216,7 @@ Custom data files should follow this structure:
 - `glucose`: Required. Glucose measurements in mmol/L.
 - `insulin`: Optional for CGM, required for OGTT3/OGTT4. Insulin in mU/L.
 - `fasting_insulin`: Optional. Used for CGM if insulin array not provided (default: 7.9).
+- `parameters`: Optional. If present, optimization is skipped and these values are used.
 
 OGTT4 optimization with both outputs:
 

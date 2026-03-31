@@ -132,8 +132,7 @@ function print_usage()
     println("Flags:")
     println("  -h, --help                 Show help")
     println("  -scenario NAME             Scenario: cgm | ogtt3 | ogtt4 (default: cgm)")
-    println("  -data FILE                 Load real data from JSON file")
-    println("  -params CSV                Predefined parameters (scenario-specific)")
+    println("  -data FILE                 Load data JSON from input directory")
     println("  -json [filename]           Save JSON output (default: results_<scenario>.json)")
     println("  -image [filename]          Save figure PNG (default: fig_<scenario>_curves.png)")
     println()
@@ -146,25 +145,58 @@ function print_usage()
     println("  {")
     println("    \"time\": [...],")
     println("    \"glucose\": [...],")
-    println("    \"insulin\": [...]")
+    println("    \"insulin\": [...],")
+    println("    \"parameters\": [...]   # optional; if present, optimization is skipped")
     println("  }")
     println()
     println("Examples:")
     println("  julia edes_universal_runner.jl -scenario cgm -json -image")
-    println("  julia edes_universal_runner.jl -scenario ogtt3 -params 0.01,0.05,3.0,0.5,0.3 -json ogtt3.json")
-    println("  julia edes_universal_runner.jl -scenario ogtt4 -params 0.01,0.05,3.0,7.5,0.5,0.3 -image ogtt4.png")
-    println("  julia edes_universal_runner.jl -scenario cgm -data mydata.json -json")
+    println("  julia edes_universal_runner.jl -scenario ogtt3 -data test_data_ogtt3.json -json ogtt3.json")
+    println("  julia edes_universal_runner.jl -scenario ogtt3 -data test_data_ogtt3_with_params.json -json ogtt3_pretrained.json")
 end
 
-function parse_params_csv(text::String)
-    raw = split(text, ",")
-    vals = Float64[]
-    for token in raw
-        cleaned = strip(token)
-        push!(vals, parse(Float64, cleaned))
+function expected_param_names(scenario::String)
+    if scenario == "ogtt4"
+        return ["k1", "k5", "k6", "k8", "sigma_g", "sigma_i"]
+    elseif scenario == "ogtt3" || scenario == "cgm"
+        return ["k1", "k5", "k6", "sigma_g", "sigma_i"]
     end
-    any(!isfinite, vals) && error("-params values must all be finite numbers")
+    error("Unknown scenario '$scenario'.")
+end
+
+function resolve_input_path(input_dir::String, filename::String)
+    return isabspath(filename) ? filename : joinpath(input_dir, filename)
+end
+
+function parse_parameters_json(raw_params, scenario::String)
+    names = expected_param_names(scenario)
+
+    if raw_params isa AbstractVector
+        vals = Float64.(raw_params)
+    elseif raw_params isa AbstractDict
+        vals = Float64[]
+        for n in names
+            haskey(raw_params, n) || error("parameters JSON is missing key '$n'")
+            push!(vals, Float64(raw_params[n]))
+        end
+    else
+        error("'parameters' must be either a JSON array or object")
+    end
+
+    length(vals) == length(names) || error("Scenario '$scenario' expects $(length(names)) parameters, got $(length(vals)).")
+    any(!isfinite, vals) && error("parameters contains non-finite values")
     return vals
+end
+
+function default_data_filename(scenario::String)
+    if scenario == "cgm"
+        return "test_data_cgm.json"
+    elseif scenario == "ogtt3"
+        return "test_data_ogtt3.json"
+    elseif scenario == "ogtt4"
+        return "test_data_ogtt4.json"
+    end
+    error("Unknown scenario '$scenario'.")
 end
 
 function load_data_json(filepath::String, scenario_hint::String)
@@ -214,8 +246,13 @@ function load_data_json(filepath::String, scenario_hint::String)
     all(isfinite, glucose_data) || error("glucose contains non-finite values")
     all(isfinite, insulin_data) || error("insulin contains non-finite values")
     
-    # Return as matrix compatible with build_scenario_data format
-    return convert(Matrix{Float64}, [time_data'; glucose_data'; insulin_data'])
+    params_from_json = nothing
+    if haskey(content, "parameters")
+        params_from_json = parse_parameters_json(content["parameters"], scenario_hint)
+    end
+
+    # Return matrix compatible with build_scenario_data format and optional parameters
+    return convert(Matrix{Float64}, [time_data'; glucose_data'; insulin_data']), params_from_json
 end
 
 function resolve_output_path(out_dir::String, filename::String)
@@ -224,7 +261,6 @@ end
 
 function parse_cli(args::Vector{String})
     scenario = "cgm"
-    predefined_params = nothing
     data_file = nothing
     emit_json = false
     emit_image = false
@@ -244,10 +280,6 @@ function parse_cli(args::Vector{String})
         elseif arg == "-data"
             i < length(args) || error("Missing value after -data")
             data_file = args[i + 1]
-            i += 2
-        elseif arg == "-params"
-            i < length(args) || error("Missing value after -params")
-            predefined_params = parse_params_csv(args[i + 1])
             i += 2
         elseif arg == "-json"
             emit_json = true
@@ -273,7 +305,6 @@ function parse_cli(args::Vector{String})
     return (;
         scenario = scenario,
         data_file = data_file,
-        predefined_params = predefined_params,
         emit_json = emit_json,
         emit_image = emit_image,
         json_filename = json_filename,
@@ -414,13 +445,14 @@ end
 
 cli = parse_cli(ARGS)
 
-# Load custom data if provided
-custom_data = nothing
-if cli.data_file !== nothing
-    println("[INFO] Loading data from: $(cli.data_file)")
-    custom_data = load_data_json(cli.data_file, cli.scenario)
-    println("[INFO] Data loaded successfully: $(size(custom_data)) matrix")
-end
+input_dir = get(ENV, "EDES_INPUT_DIR", joinpath(@__DIR__, "inputs"))
+
+# Always load scenario data from input files (defaults to test_data_<scenario>.json)
+data_file = cli.data_file === nothing ? default_data_filename(cli.scenario) : cli.data_file
+data_path = resolve_input_path(input_dir, data_file)
+println("[INFO] Loading data from: $data_path")
+custom_data, predefined_params = load_data_json(data_path, cli.scenario)
+println("[INFO] Data loaded successfully: $(size(custom_data)) matrix")
 
 cfg = build_scenario_data(cli.scenario, custom_data)
 constants = build_constants(cfg)
@@ -436,14 +468,17 @@ else
     println("[INFO]   Insulin: Fixed at fasting level")
 end
 
-if cli.predefined_params !== nothing
-    validate_params!(cli.predefined_params, cfg)
+if predefined_params !== nothing
+    validate_params!(predefined_params, cfg)
+    println("[INFO] Pretrained parameters found in JSON. Optimization will be skipped.")
+else
+    println("[INFO] No pretrained parameters in JSON. Optimization will run.")
 end
 
 prob = ODEProblem(edesode!, [0.0, cfg["Gb"], cfg["Ib"], 0.0], (0.0, 240.0), constants)
 
-if cli.predefined_params === nothing
-    println("[INFO] Scenario=$(cfg["scenario"]) with no -params. Running optimization with measurement data.")
+if predefined_params === nothing
+    println("[INFO] Scenario=$(cfg["scenario"]) with no pretrained parameters. Running optimization with measurement data.")
     if cfg["uses_insulin_data"]
         println("[INFO] Fitting to both glucose and insulin measurements")
     else
@@ -480,7 +515,7 @@ if cli.predefined_params === nothing
     final_params = results[best_idx].u
     println("[OK] Best objective=$(results[best_idx].objective)")
 else
-    final_params = cli.predefined_params
+    final_params = predefined_params
     println("[OK] Scenario=$(cfg["scenario"]) using validated predefined parameters.")
 end
 
@@ -494,7 +529,7 @@ solution = solve(prob, ode_solver, p = construct_parameters(final_params, consta
                  u0 = [0.0, data[2, 1], data[3, 1], 0.0])
 println("[OK] Simulation complete for $(length(solution.t)) time points")
 
-output_dir = @__DIR__
+output_dir = get(ENV, "EDES_OUTPUT_DIR", joinpath(@__DIR__, "outputs"))
 default_json_name = "results_$(cfg["scenario"]).json"
 default_image_name = "fig_$(cfg["scenario"])_curves.png"
 
@@ -509,7 +544,7 @@ if cli.emit_json
 
     payload = Dict(
         "scenario" => cfg["scenario"],
-        "parameter_source" => (cli.predefined_params === nothing ? "optimized" : "predefined"),
+        "parameter_source" => (predefined_params === nothing ? "optimized" : "predefined"),
         "parameters" => param_dict,
         "simulation" => Dict(
             "time" => collect(solution.t),

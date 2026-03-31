@@ -8,8 +8,9 @@ RUN julia --project=/app -e "import Pkg; Pkg.instantiate()"
 COPY . .
 
 # Default working dir for mounted input/output files.
-WORKDIR /io
-ENV EDES_OUTPUT_DIR=/io
+WORKDIR /outputs
+ENV EDES_INPUT_DIR=/inputs
+ENV EDES_OUTPUT_DIR=/outputs
 ENV EDES_PROJECT_DIR=/app
 ENV EDES_AUTO_PKG=0
 
