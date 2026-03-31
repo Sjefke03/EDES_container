@@ -10,15 +10,15 @@ Script:
 
 - edes_universal_runner.jl
 
-Run from repo root:
+Run from this folder (`runnable`):
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl [flags]
+julia edes_universal_runner.jl [flags]
 ```
 
 ## Docker One-Shot Usage
 
-Build image from repository root:
+Build image from this folder (`runnable`):
 
 ```bash
 docker build -t edes-universal:latest .
@@ -27,7 +27,7 @@ docker build -t edes-universal:latest .
 Run as one-shot container with mounted input/output folder:
 
 ```bash
-docker run --rm -v "${PWD}/runnable/universal:/io" edes-universal:latest -scenario cgm -data /io/test_data_cgm.json -json cgm_out.json -image cgm_out.png
+docker run --rm -v "${PWD}:/io" edes-universal:latest -scenario cgm -data /io/test_data_cgm.json -json cgm_out.json -image cgm_out.png
 ```
 
 Notes:
@@ -99,7 +99,7 @@ When **no `-params` flag** is provided, the script automatically runs **paramete
 
 ```bash
 # Fit parameters to your OGTT3 patient data
-julia runnable/universal/edes_universal_runner.jl -scenario ogtt3 -data patient_data.json -json fit_results.json -image fit_curves.png
+julia edes_universal_runner.jl -scenario ogtt3 -data patient_data.json -json fit_results.json -image fit_curves.png
 ```
 
 Output shows:
@@ -118,55 +118,55 @@ Output shows:
 Help:
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl --help
+julia edes_universal_runner.jl --help
 ```
 
 CGM optimization with JSON and image:
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl -scenario cgm -json -image
+julia edes_universal_runner.jl -scenario cgm -json -image
 ```
 
 OGTT3 with predefined params and custom JSON:
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl -scenario ogtt3 -params 0.01,0.05,3.0,0.5,0.3 -json ogtt3_result.json
+julia edes_universal_runner.jl -scenario ogtt3 -params 0.01,0.05,3.0,0.5,0.3 -json ogtt3_result.json
 ```
 
 OGTT4 with predefined params and custom image name:
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl -scenario ogtt4 -params 0.01,0.05,3.0,7.5,0.5,0.3 -image ogtt4_curves.png
+julia edes_universal_runner.jl -scenario ogtt4 -params 0.01,0.05,3.0,7.5,0.5,0.3 -image ogtt4_curves.png
 ```
 
 CGM with custom data from JSON and predefined params:
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl -scenario cgm -data mydata.json -params 0.01,0.05,3.0,0.5,0.3 -json -image
+julia edes_universal_runner.jl -scenario cgm -data mydata.json -params 0.01,0.05,3.0,0.5,0.3 -json -image
 ```
 
 OGTT3 with custom data and optimization:
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl -scenario ogtt3 -data patient_ogtt3.json -json ogtt3_fit.json
+julia edes_universal_runner.jl -scenario ogtt3 -data patient_ogtt3.json -json ogtt3_fit.json
 ```
 
 ## Test Commands by Scenario
 
-Run these from repository root.
+Run these from this folder (`runnable`).
 
 ### CGM
 
 Without predefined parameters (optimize from test data):
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl -scenario cgm -data runnable/universal/test_data_cgm.json -json cgm_out.json -image cgm_out.png
+julia edes_universal_runner.jl -scenario cgm -data test_data_cgm.json -json cgm_out.json -image cgm_out.png
 ```
 
 With predefined parameters (from cgm_out.json):
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl -scenario cgm -data runnable/universal/test_data_cgm.json -params 0.00880779075272941,0.00955640649315587,5.0,0.0206730458249846,25.04999999999984 -json cgm_predef_out.json -image cgm_predef_out.png
+julia edes_universal_runner.jl -scenario cgm -data test_data_cgm.json -params 0.00880779075272941,0.00955640649315587,5.0,0.0206730458249846,25.04999999999984 -json cgm_predef_out.json -image cgm_predef_out.png
 ```
 
 ### OGTT3
@@ -174,13 +174,13 @@ julia runnable/universal/edes_universal_runner.jl -scenario cgm -data runnable/u
 Without predefined parameters (optimize from test data):
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl -scenario ogtt3 -data runnable/universal/test_data_ogtt3.json -json ogtt3_out.json -image ogtt3_out.png
+julia edes_universal_runner.jl -scenario ogtt3 -data test_data_ogtt3.json -json ogtt3_out.json -image ogtt3_out.png
 ```
 
 With predefined parameters (from ogtt3_out.json):
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl -scenario ogtt3 -data runnable/universal/test_data_ogtt3.json -params 0.015267477934545208,0.050921296545794935,1.5531234642813734,0.010000000000000002,0.20032085650634182 -json ogtt3_predef_out.json -image ogtt3_predef_out.png
+julia edes_universal_runner.jl -scenario ogtt3 -data test_data_ogtt3.json -params 0.015267477934545208,0.050921296545794935,1.5531234642813734,0.010000000000000002,0.20032085650634182 -json ogtt3_predef_out.json -image ogtt3_predef_out.png
 ```
 
 ### OGTT4
@@ -188,13 +188,13 @@ julia runnable/universal/edes_universal_runner.jl -scenario ogtt3 -data runnable
 Without predefined parameters (optimize from test data):
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl -scenario ogtt4 -data runnable/universal/test_data_ogtt4.json -json ogtt4_out.json -image ogtt4_out.png
+julia edes_universal_runner.jl -scenario ogtt4 -data test_data_ogtt4.json -json ogtt4_out.json -image ogtt4_out.png
 ```
 
 With predefined parameters (from ogtt4_out.json):
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl -scenario ogtt4 -data runnable/universal/test_data_ogtt4.json -params 0.014518160037517042,0.05188548641056432,1.5308380035708968,5.5327535782440815,0.010000000000000002,0.1697258921293979 -json ogtt4_predef_out.json -image ogtt4_predef_out.png
+julia edes_universal_runner.jl -scenario ogtt4 -data test_data_ogtt4.json -params 0.014518160037517042,0.05188548641056432,1.5308380035708968,5.5327535782440815,0.010000000000000002,0.1697258921293979 -json ogtt4_predef_out.json -image ogtt4_predef_out.png
 ```
 
 ## JSON Data Format
@@ -220,5 +220,5 @@ Custom data files should follow this structure:
 OGTT4 optimization with both outputs:
 
 ```bash
-julia runnable/universal/edes_universal_runner.jl -scenario ogtt4 -json -image
+julia edes_universal_runner.jl -scenario ogtt4 -json -image
 ```

@@ -1,6 +1,6 @@
 # edes_universal_runner.jl
 # Universal EDES runner for: cgm, ogtt3, ogtt4
-# Run from repo root: julia runnable/universal/edes_universal_runner.jl [flags]
+# Run from this folder: julia edes_universal_runner.jl [flags]
 
 project_dir = get(ENV, "EDES_PROJECT_DIR", @__DIR__)
 import Pkg; Pkg.activate(project_dir)
@@ -127,7 +127,7 @@ end
 # -----------------------------------------------------------------------------
 
 function print_usage()
-    println("Usage: julia runnable/universal/edes_universal_runner.jl [flags]")
+    println("Usage: julia edes_universal_runner.jl [flags]")
     println()
     println("Flags:")
     println("  -h, --help                 Show help")
@@ -150,10 +150,10 @@ function print_usage()
     println("  }")
     println()
     println("Examples:")
-    println("  julia runnable/universal/edes_universal_runner.jl -scenario cgm -json -image")
-    println("  julia runnable/universal/edes_universal_runner.jl -scenario ogtt3 -params 0.01,0.05,3.0,0.5,0.3 -json ogtt3.json")
-    println("  julia runnable/universal/edes_universal_runner.jl -scenario ogtt4 -params 0.01,0.05,3.0,7.5,0.5,0.3 -image ogtt4.png")
-    println("  julia runnable/universal/edes_universal_runner.jl -scenario cgm -data mydata.json -json")
+    println("  julia edes_universal_runner.jl -scenario cgm -json -image")
+    println("  julia edes_universal_runner.jl -scenario ogtt3 -params 0.01,0.05,3.0,0.5,0.3 -json ogtt3.json")
+    println("  julia edes_universal_runner.jl -scenario ogtt4 -params 0.01,0.05,3.0,7.5,0.5,0.3 -image ogtt4.png")
+    println("  julia edes_universal_runner.jl -scenario cgm -data mydata.json -json")
 end
 
 function parse_params_csv(text::String)
