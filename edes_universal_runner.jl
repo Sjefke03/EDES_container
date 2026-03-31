@@ -201,58 +201,90 @@ end
 
 function load_data_json(filepath::String, scenario_hint::String)
     """Load real data from JSON file.
-    
-    Expected format:
+
+    Supports two formats:
+
+    New ontology format (v2):
     {
-      "scenario": "cgm",  (optional, can override command line)
+      "HDT-EDES-SCENARIO": "cgm",
+      "14749-6": { "timestamps_min": [...], "values": [...] },
+      "20448-7": { "value": 7.9 },
+      "HDT-EDES-INSULIN": { "timestamps_min": [...], "values": [...] },  // ogtt3/ogtt4
+      "HDT-EDES-PARAMS": { "k1": ..., ... }  // optional
+    }
+
+    Legacy format:
+    {
       "time": [...],
       "glucose": [...],
-      "insulin": [...]    (required for ogtt scenarios, optional for cgm)
+      "insulin": [...],    // required for ogtt scenarios
+      "fasting_insulin": 7.9,
+      "parameters": [...]  // optional
     }
     """
     !isfile(filepath) && error("Data file not found: $filepath")
-    
+
     content = JSON.parsefile(filepath)
-    
-    # Validate required fields
-    haskey(content, "time") || error("JSON data must contain 'time' array")
-    haskey(content, "glucose") || error("JSON data must contain 'glucose' array")
-    
-    time_data = vec(content["time"])
-    glucose_data = vec(content["glucose"])
-    
-    # Insulin is optional for CGM, but required for OGTT
-    if scenario_hint in ["ogtt3", "ogtt4"]
-        haskey(content, "insulin") || error("Scenario '$scenario_hint' requires 'insulin' array in JSON")
-        insulin_data = vec(content["insulin"])
-    else
-        # For CGM, use fasting insulin if not provided
-        insulin_data = get(content, "insulin", nothing)
-        if insulin_data === nothing
-            fasting_ins = get(content, "fasting_insulin", 7.9)
-            insulin_data = [fasting_ins; zeros(length(time_data) - 1)]
+
+    if haskey(content, "HDT-EDES-SCENARIO")
+        # ── New ontology format ──────────────────────────────────────────────
+        scenario_hint = content["HDT-EDES-SCENARIO"]
+
+        haskey(content, "14749-6") || error("New-format JSON must contain '14749-6' (glucose time series)")
+        glucose_block = content["14749-6"]
+        time_data    = vec(Float64.(glucose_block["timestamps_min"]))
+        glucose_data = vec(Float64.(glucose_block["values"]))
+
+        if scenario_hint in ["ogtt3", "ogtt4"]
+            haskey(content, "HDT-EDES-INSULIN") ||
+                error("Scenario '$scenario_hint' requires 'HDT-EDES-INSULIN' in new-format JSON")
+            insulin_data = vec(Float64.(content["HDT-EDES-INSULIN"]["values"]))
         else
-            insulin_data = vec(insulin_data)
+            insulin_block = get(content, "20448-7", Dict())
+            fasting_ins   = get(insulin_block, "value", 7.9)
+            insulin_data  = [Float64(fasting_ins); zeros(length(time_data) - 1)]
+        end
+
+        params_from_json = haskey(content, "HDT-EDES-PARAMS") ?
+            parse_parameters_json(content["HDT-EDES-PARAMS"], scenario_hint) : nothing
+
+    else
+        # ── Legacy format ────────────────────────────────────────────────────
+        haskey(content, "time")    || error("JSON data must contain 'time' array")
+        haskey(content, "glucose") || error("JSON data must contain 'glucose' array")
+
+        time_data    = vec(Float64.(content["time"]))
+        glucose_data = vec(Float64.(content["glucose"]))
+
+        if scenario_hint in ["ogtt3", "ogtt4"]
+            haskey(content, "insulin") ||
+                error("Scenario '$scenario_hint' requires 'insulin' array in JSON")
+            insulin_data = vec(Float64.(content["insulin"]))
+        else
+            raw_ins = get(content, "insulin", nothing)
+            if raw_ins === nothing
+                fasting_ins  = get(content, "fasting_insulin", 7.9)
+                insulin_data = [Float64(fasting_ins); zeros(length(time_data) - 1)]
+            else
+                insulin_data = vec(Float64.(raw_ins))
+            end
+        end
+
+        params_from_json = nothing
+        if haskey(content, "parameters")
+            params_from_json = parse_parameters_json(content["parameters"], scenario_hint)
         end
     end
-    
-    # Validate sizes
+
+    # Common validation
     length(time_data) == length(glucose_data) || error("time and glucose arrays must have equal length")
     length(time_data) == length(insulin_data) || error("time and insulin arrays must have equal length")
     length(time_data) >= 3 || error("Must have at least 3 data points")
-    
-    # Check for valid values
-    all(isfinite, time_data) || error("time contains non-finite values")
+    all(isfinite, time_data)    || error("time contains non-finite values")
     all(isfinite, glucose_data) || error("glucose contains non-finite values")
     all(isfinite, insulin_data) || error("insulin contains non-finite values")
-    
-    params_from_json = nothing
-    if haskey(content, "parameters")
-        params_from_json = parse_parameters_json(content["parameters"], scenario_hint)
-    end
 
-    # Return matrix compatible with build_scenario_data format and optional parameters
-    return convert(Matrix{Float64}, [time_data'; glucose_data'; insulin_data']), params_from_json
+    return convert(Matrix{Float64}, [time_data'; glucose_data'; insulin_data']), params_from_json, scenario_hint
 end
 
 function resolve_output_path(out_dir::String, filename::String)
@@ -447,11 +479,25 @@ cli = parse_cli(ARGS)
 
 input_dir = get(ENV, "EDES_INPUT_DIR", joinpath(@__DIR__, "inputs"))
 
-# Always load scenario data from input files (defaults to test_data_<scenario>.json)
-data_file = cli.data_file === nothing ? default_data_filename(cli.scenario) : cli.data_file
-data_path = resolve_input_path(input_dir, data_file)
+# Check for input.json (docker runner mode) — overrides CLI data_file and scenario
+input_json_candidate = joinpath(input_dir, "input.json")
+if isfile(input_json_candidate) && cli.data_file === nothing
+    data_path = input_json_candidate
+else
+    data_file = cli.data_file === nothing ? default_data_filename(cli.scenario) : cli.data_file
+    data_path = resolve_input_path(input_dir, data_file)
+end
+
 println("[INFO] Loading data from: $data_path")
-custom_data, predefined_params = load_data_json(data_path, cli.scenario)
+custom_data, predefined_params, effective_scenario = load_data_json(data_path, cli.scenario)
+
+# Use scenario from file if it differs from the CLI default
+if effective_scenario != cli.scenario
+    println("[INFO] Scenario overridden by input file: $(cli.scenario) -> $effective_scenario")
+    cli = (scenario=effective_scenario, data_file=cli.data_file, emit_json=cli.emit_json,
+           emit_image=cli.emit_image, json_filename=cli.json_filename, image_filename=cli.image_filename)
+end
+
 println("[INFO] Data loaded successfully: $(size(custom_data)) matrix")
 
 cfg = build_scenario_data(cli.scenario, custom_data)
@@ -533,16 +579,99 @@ output_dir = get(ENV, "EDES_OUTPUT_DIR", joinpath(@__DIR__, "outputs"))
 default_json_name = "results_$(cfg["scenario"]).json"
 default_image_name = "fig_$(cfg["scenario"])_curves.png"
 
+# Build parameter dict for outputs
+param_dict = Dict{String, Float64}()
+for (name, value) in zip(cfg["param_names"], final_params)
+    param_dict[name] = value
+end
+
+# Compute diagnoses
+fasting_glucose = data[2, 1]
+peak_glucose    = maximum(solution[2, :])
+
+diagnoses = Dict{String, Any}[]
+if peak_glucose >= 11.1
+    push!(diagnoses, Dict("ontology_term_code" => "44054006",
+                          "name" => "Type 2 Diabetes Mellitus Risk",
+                          "present" => true,
+                          "evidence" => "Peak simulated plasma glucose $(round(peak_glucose, digits=2)) mmol/L (>= 11.1)"))
+elseif peak_glucose >= 7.8
+    push!(diagnoses, Dict("ontology_term_code" => "9414007",
+                          "name" => "Impaired Glucose Tolerance",
+                          "present" => true,
+                          "evidence" => "Peak simulated plasma glucose $(round(peak_glucose, digits=2)) mmol/L (7.8–11.1 range)"))
+else
+    push!(diagnoses, Dict("ontology_term_code" => "HDT-DIAG-NORMAL-GLUCOSE",
+                          "name" => "Normal Glucose Regulation",
+                          "present" => true,
+                          "evidence" => "Peak $(round(peak_glucose, digits=2)) mmol/L < 7.8 and fasting $(round(fasting_glucose, digits=2)) mmol/L <= 6.1"))
+end
+if fasting_glucose > 6.1
+    push!(diagnoses, Dict("ontology_term_code" => "HDT-DIAG-ELEVATED-FASTING-GLUCOSE",
+                          "name" => "Elevated Fasting Glucose",
+                          "present" => true,
+                          "evidence" => "Fasting glucose $(round(fasting_glucose, digits=2)) mmol/L > 6.1"))
+end
+
+# Compute advices
+advices = Dict{String, Any}[]
+if peak_glucose >= 11.1
+    push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-CONSULT-HCP",
+                        "name" => "Consult Healthcare Provider",
+                        "message" => "Consult a healthcare provider for further clinical evaluation and management."))
+    push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-REDUCE-CARBS",
+                        "name" => "Reduce Carbohydrate Intake",
+                        "message" => "Reduce dietary carbohydrate intake to lower post-meal glucose excursions."))
+elseif peak_glucose >= 7.8
+    push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-INCREASE-ACTIVITY",
+                        "name" => "Increase Physical Activity",
+                        "message" => "Increase aerobic physical activity to improve insulin sensitivity and glucose tolerance."))
+    push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-MONITOR-GLUCOSE",
+                        "name" => "Increase Monitoring Frequency",
+                        "message" => "Increase the frequency of continuous glucose monitoring."))
+end
+
+# Always write ontology-coded output.json to EDES_OUTPUT_DIR
+ontology_payload = Dict(
+    "outputs" => Dict(
+        "HDT-EDES-PLASMA-GLUCOSE" => Dict(
+            "timestamps_min" => collect(solution.t),
+            "values"         => collect(solution[2, :]),
+            "unit"           => "mmol/L",
+        ),
+        "HDT-EDES-PLASMA-INSULIN" => Dict(
+            "timestamps_min" => collect(solution.t),
+            "values"         => collect(solution[3, :]),
+            "unit"           => "mU/L",
+        ),
+        "HDT-EDES-GUT-GLUCOSE" => Dict(
+            "timestamps_min" => collect(solution.t),
+            "values"         => collect(solution[1, :]),
+            "unit"           => "mg",
+        ),
+        "HDT-EDES-INTERSTITIUM-INSULIN" => Dict(
+            "timestamps_min" => collect(solution.t),
+            "values"         => collect(solution[4, :]),
+            "unit"           => "mU/L",
+        ),
+        "HDT-EDES-FIT-PARAMS" => param_dict,
+    ),
+    "diagnoses" => diagnoses,
+    "advices"   => advices,
+)
+
+mkpath(output_dir)
+output_json_path = joinpath(output_dir, "output.json")
+open(output_json_path, "w") do f
+    write(f, JSON.json(ontology_payload, 2))
+end
+println("[OK] output.json saved: $output_json_path")
+
 if cli.emit_json
     json_name = isempty(cli.json_filename) ? default_json_name : cli.json_filename
     json_path = resolve_output_path(output_dir, json_name)
 
-    param_dict = Dict{String, Float64}()
-    for (name, value) in zip(cfg["param_names"], final_params)
-        param_dict[name] = value
-    end
-
-    payload = Dict(
+    legacy_payload = Dict(
         "scenario" => cfg["scenario"],
         "parameter_source" => (predefined_params === nothing ? "optimized" : "predefined"),
         "parameters" => param_dict,
@@ -561,11 +690,11 @@ if cli.emit_json
     )
 
     open(json_path, "w") do fjson
-        write(fjson, JSON.json(payload, 2))
+        write(fjson, JSON.json(legacy_payload, 2))
     end
-    println("[OK] JSON saved: $json_path")
+    println("[OK] Legacy JSON saved: $json_path")
 else
-    println("[INFO] JSON output disabled. Use -json to enable it.")
+    println("[INFO] Legacy JSON output disabled. Use -json to enable it.")
 end
 
 if cli.emit_image

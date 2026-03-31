@@ -1,0 +1,30 @@
+{
+  "model_id": "edes-universal",
+  "name": "EDES Universal Glucose-Insulin Model",
+  "version": "1.0.0",
+  "description": "Extended Dartmouth-Exeter Simulator (EDES) ODE model fitting patient-specific parameters from CGM/OGTT data and simulating post-meal glucose-insulin dynamics.",
+  "image_uri": "edes-universal:latest",
+  "ontology_version_tag": "EDES-HDT-1.0.0",
+  "execution_command": [],
+  "env_vars": { "EDES_AUTO_PKG": "0" },
+  "definitions": [
+    { "type": "INPUT",     "ontology_term_code": "HDT-EDES-SCENARIO",                 "name": "Run Scenario",                  "description": "cgm | ogtt3 | ogtt4",                    "required": true,  "unit": null },
+    { "type": "INPUT",     "ontology_term_code": "14749-6",                            "name": "Plasma Glucose Time Series",     "description": "CGM/OGTT glucose (mmol/L)",               "required": true,  "unit": "mmol/L" },
+    { "type": "INPUT",     "ontology_term_code": "20448-7",                            "name": "Fasting Plasma Insulin",         "description": "Baseline insulin (mU/L)",                  "required": true,  "unit": "mU/L" },
+    { "type": "INPUT",     "ontology_term_code": "29463-7",                            "name": "Body Weight",                    "description": "Patient weight (kg)",                      "required": false, "unit": "kg" },
+    { "type": "INPUT",     "ontology_term_code": "HDT-EDES-PARAMS",                   "name": "Pre-Trained Parameters",         "description": "Skip optimisation if provided",           "required": false, "unit": null },
+    { "type": "OUTPUT",    "ontology_term_code": "HDT-EDES-PLASMA-GLUCOSE",           "name": "Simulated Plasma Glucose",       "description": "Glucose trajectory (mmol/L)",             "required": true,  "unit": "mmol/L" },
+    { "type": "OUTPUT",    "ontology_term_code": "HDT-EDES-PLASMA-INSULIN",           "name": "Simulated Plasma Insulin",       "description": "Insulin trajectory (mU/L)",               "required": true,  "unit": "mU/L" },
+    { "type": "OUTPUT",    "ontology_term_code": "HDT-EDES-GUT-GLUCOSE",              "name": "Gut Glucose Absorption",         "description": "Gut glucose over time (mg)",              "required": true,  "unit": "mg" },
+    { "type": "OUTPUT",    "ontology_term_code": "HDT-EDES-INTERSTITIUM-INSULIN",     "name": "Interstitium Insulin",           "description": "Interstitium insulin (mU/L)",             "required": true,  "unit": "mU/L" },
+    { "type": "OUTPUT",    "ontology_term_code": "HDT-EDES-FIT-PARAMS",               "name": "Optimised Parameters",           "description": "Fitted EDES parameters",                  "required": true,  "unit": null },
+    { "type": "DIAGNOSIS", "ontology_term_code": "9414007",                            "name": "Impaired Glucose Tolerance",     "description": "Peak 2h glucose 7.8–11.1 mmol/L",         "required": false, "unit": null },
+    { "type": "DIAGNOSIS", "ontology_term_code": "44054006",                           "name": "Type 2 Diabetes Mellitus Risk",  "description": "Peak 2h glucose >= 11.1 mmol/L",          "required": false, "unit": null },
+    { "type": "DIAGNOSIS", "ontology_term_code": "HDT-DIAG-ELEVATED-FASTING-GLUCOSE", "name": "Elevated Fasting Glucose",       "description": "Fasting glucose > 6.1 mmol/L",            "required": false, "unit": null },
+    { "type": "DIAGNOSIS", "ontology_term_code": "HDT-DIAG-NORMAL-GLUCOSE",           "name": "Normal Glucose Regulation",      "description": "Peak < 7.8 and fasting <= 6.1 mmol/L",   "required": false, "unit": null },
+    { "type": "ADVICE",    "ontology_term_code": "HDT-ADVICE-CONSULT-HCP",            "name": "Consult Healthcare Provider",    "description": "Triggered on Type 2 risk",                "required": false, "unit": null },
+    { "type": "ADVICE",    "ontology_term_code": "HDT-ADVICE-REDUCE-CARBS",           "name": "Reduce Carbohydrate Intake",     "description": "Triggered on Type 2 risk",                "required": false, "unit": null },
+    { "type": "ADVICE",    "ontology_term_code": "HDT-ADVICE-INCREASE-ACTIVITY",      "name": "Increase Physical Activity",     "description": "Triggered on IGT",                        "required": false, "unit": null },
+    { "type": "ADVICE",    "ontology_term_code": "HDT-ADVICE-MONITOR-GLUCOSE",        "name": "Increase Monitoring Frequency",  "description": "Triggered on IGT",                        "required": false, "unit": null }
+  ]
+}
