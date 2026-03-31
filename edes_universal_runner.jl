@@ -248,6 +248,9 @@ function load_data_json(filepath::String, scenario_hint::String)
         params_from_json = haskey(content, "HDT-EDES-PARAMS") ?
             parse_parameters_json(content["HDT-EDES-PARAMS"], scenario_hint) : nothing
 
+        # Meal dose: HDT-EDES-MEAL-DOSE.value in mg (default 75 000 mg = 75 g)
+        meal_dose_mg = Float64(get(get(content, "HDT-EDES-MEAL-DOSE", Dict()), "value", Dmeal))
+
     else
         # ── Legacy format ────────────────────────────────────────────────────
         haskey(content, "time")    || error("JSON data must contain 'time' array")
@@ -274,6 +277,7 @@ function load_data_json(filepath::String, scenario_hint::String)
         if haskey(content, "parameters")
             params_from_json = parse_parameters_json(content["parameters"], scenario_hint)
         end
+        meal_dose_mg = Dmeal   # legacy format has no meal dose field
     end
 
     # Common validation
@@ -284,7 +288,7 @@ function load_data_json(filepath::String, scenario_hint::String)
     all(isfinite, glucose_data) || error("glucose contains non-finite values")
     all(isfinite, insulin_data) || error("insulin contains non-finite values")
 
-    return convert(Matrix{Float64}, [time_data'; glucose_data'; insulin_data']), params_from_json, scenario_hint
+    return convert(Matrix{Float64}, [time_data'; glucose_data'; insulin_data']), params_from_json, scenario_hint, meal_dose_mg
 end
 
 function resolve_output_path(out_dir::String, filename::String)
@@ -362,9 +366,9 @@ end
 # Model and loss
 # -----------------------------------------------------------------------------
 
-function build_constants(cfg::Dict)
+function build_constants(cfg::Dict, meal_dose::Float64 = Dmeal)
     Vg = 17.0 / bw
-    return [k2, k3, k4, k7, k9, k10, tau_i, tau_d, beta, Gren, EGPb, Km, f, Vg, c1, sigma, Dmeal, bw, cfg["Gb"], cfg["Ib"]]
+    return [k2, k3, k4, k7, k9, k10, tau_i, tau_d, beta, Gren, EGPb, Km, f, Vg, c1, sigma, meal_dose, bw, cfg["Gb"], cfg["Ib"]]
 end
 
 function edesode!(du, u, p, t)
@@ -489,7 +493,7 @@ else
 end
 
 println("[INFO] Loading data from: $data_path")
-custom_data, predefined_params, effective_scenario = load_data_json(data_path, cli.scenario)
+custom_data, predefined_params, effective_scenario, meal_dose_mg = load_data_json(data_path, cli.scenario)
 
 # Use scenario from file if it differs from the CLI default
 if effective_scenario != cli.scenario
@@ -501,7 +505,8 @@ end
 println("[INFO] Data loaded successfully: $(size(custom_data)) matrix")
 
 cfg = build_scenario_data(cli.scenario, custom_data)
-constants = build_constants(cfg)
+println("[INFO] Meal dose: $(meal_dose_mg / 1000.0) g ($(meal_dose_mg) mg)")
+constants = build_constants(cfg, meal_dose_mg)
 data = cfg["data"]
 
 # Log measurement data being used
