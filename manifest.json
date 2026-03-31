@@ -1,9 +1,9 @@
 {
-  "model_id": "edes-universal",
-  "name": "EDES Universal Glucose-Insulin Model",
+  "model_id": "edes-cgm",
+  "name": "EDES cgm Glucose-Insulin Model",
   "version": "1.0.0",
   "description": "Extended Dartmouth-Exeter Simulator (EDES) ODE model fitting patient-specific parameters from CGM/OGTT data and simulating post-meal glucose-insulin dynamics.",
-  "image_uri": "edes-universal:latest",
+  "image_uri": "edes-cgm:latest",
   "ontology_version_tag": "EDES-HDT-1.0.0",
   "execution_command": [],
   "env_vars": { "EDES_AUTO_PKG": "0" },
