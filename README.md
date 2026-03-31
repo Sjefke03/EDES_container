@@ -1,125 +1,232 @@
-<img src="figures/TUe.png" width="280" height="70"> <img src="figures/EAISI.png" width="200" height="60">
+# Universal EDES Runner
 
-# Parameter Indentifiability: Personalising the Eindhoven Diabetes Education Simulator
-This is the repository for the Tutorial on parameter uniqueness/identifiability as part of the VITAL Training School 1, Delft University of Technology on March 19th 2025. 
+This folder contains a single universal runner that supports all current scenarios:
 
-## About the Tutorial
-Computational models are a valuable tool to study dynamic interactions and the evolution of systems behavior. Our hands-on and interactive workshop will demonstrate how personalized models can be more rapidly generated in Julia using various SciML packages combined with custom implementations. We will cover the implementation of ODE models in Julia, parameter estimation and model selection strategies including parameter sensitivity and identifiability analysis.
+- cgm
+- ogtt3
+- ogtt4
 
-Computational models offer a valuable tool for understanding the dynamic interactions between different biological entities, especially in biomedical applications. Personalizing these models with data can shed light on interindividual variation and project future health risks. However, for model parameters to be meaningful and useful for interpretation it is important that they can be accuractely identifed from available data. Our hands-on and interactive workshop will demonstrate how personalized models can be more rapidly generated in Julia. We will be mainly using DifferentialEquations.jl combined with Optimization.jl. We will use an in-house model of the glucose-insulin system (Eindhoven Diabetes Education Simulator) we will breifly cover the implementation and resolving of ODE systems in Julia. We will provide a guide on performing identifiability analysis using inbuilt Julia packages such as StructuralIdentifiabilty.jl and a implementation of Profile Likelhood Analysis [2] with a variable step. For Matlab users and implementation of the model and PLA algorithm can also be provided in Matlab. Short presentation will be used to provide necessary background and theory and all methods will be implemented in a Jupyter notebook to facilitate independent learning.
+Script:
 
+- edes_universal_runner.jl
 
-## Organizers
-Shauna O'Donovan |  Max de Rooij | 
-|:---:|:---:|
-<img src="figures/O_Donovan_Shauna_BME_PO_VH_1529_UD.jpg.webp" width=90 height=120>  | <img src="figures/de_Rooij_Max_BME_PROM_PO_AS_7631.jpg.webp" width=90 height=120> | 
+Run from this folder (`runnable`):
 
-## Contents
-During the workshop, we will address the following elements of dynamic modelling in (systems) biology:
-
-Implementation and simulation of (biological) dynamic models using DifferentialEquations.jl.  
-Parameter estimation in Julia.  
-Parameter identifiability analysis with profile likelihood. 
-
-In this repository you will find:
-- A folder called *IntroductionToJulia*: this folder contains some notebooks that introduce more fundamental aspects of programming in Juila, this can be useful if you want to familiarise yourself with Julia. 
-- The  *EDES_Model_Identifiability.ipynb* notebook contains the contents of this workshop.
-- More information on the EDES model equations and parameters can be found in *EDES_Explained.pdf*
-
-## Program
-The workshop starts with a short introductory presentation, outlining the releavnce of the gluocse-insulin system in maintaining metabolic resilence, the Eindhoven Diabetes Education Simulator (EDES), a computational model of the glucose-insulin system that has been shown to capture relevant features of metabolic resilence from measures time series of glcuose and insulin. The workshop will then explain the principles of parameter identifiablity and provide hands on experience using in-built Julia packages for determining parameter identifiability and an inplementation of the Profile Liklihood Analysis methods proposed by Raue et al [2].
-
-# Julia Installation and Environment Setup
-Here you will find some instructions on how to make sure the code from this repository can run on your computer. The workshop is built to fully work with Julia version 1.9. In this instruction, we will assume you are installing Julia 1.9, but any other version is installed in a similar way. 
-
-
-### Installing Julia using the Julia version manager (juliaup) (recommended)
-The first step is to install the Julia version manager (`juliaup`), which enables you to have multiple Julia versions installed on your machine. This step is not mandatory for a properly working version of Julia, but it is useful if you are planning to use Julia for your own projects in the future.
-
-**Windows**:
->  [!NOTE]
->  The `winget` command may not be available on your machine! In that case, you can download Julia from the Microsoft Store. If your organization prevents use of the Microsoft Store, you can follow the download instructions from https://julialang.org when clicking `Download`
-
-Open your favorite terminal, or press `Win`+`R`, type `cmd` in the text bar and press 'run'.
-```
-winget install julia -s msstore
+```bash
+julia edes_universal_runner.jl [flags]
 ```
 
-**Linux & MacOS**:
+## Docker One-Shot Usage
 
-From the command line execute
-```
-curl -fsSL https://install.julialang.org | sh
-```
----
+Build image from this folder (`runnable`):
 
-Afterwards, you can restart the terminal environment. You can install a specific version of Julia using
-```
-juliaup add <version>
+```bash
+docker build -t edes-universal:latest .
 ```
 
-You can list the versions available to you using
-```
-juliaup list
-```
+Run as one-shot container with mounted input/output folder:
 
-We recommend to start with installing the latest stable version, dubbed `release` by running
-```
-juliaup add release
-```
+```bash
+docker run --rm -v "${PWD}/inputs:/inputs" -v "${PWD}/outputs:/outputs" edes-universal:latest -scenario cgm -data /inputs/test_data_cgm.json -json cgm_out.json -image cgm_out.png
+docker run --rm -v "${PWD}/inputs:/inputs" -v "${PWD}/outputs:/outputs" edes-universal:latest -scenario cgm -data /inputs/test_data_cgm_with_params.json -json cgm_out.json -image cgm_out.png
 
-If this is your only Julia version, juliaup will automatically label this as the default version. 
+docker run --rm -v "${PWD}/inputs:/inputs" -v "${PWD}/outputs:/outputs" edes-universal:latest -scenario ogtt3 -data /inputs/test_data_ogtt3.json / -json ogtt3_out.json -image ogtt3_out.png
+docker run --rm -v "${PWD}/inputs:/inputs" -v "${PWD}/outputs:/outputs" edes-universal:latest -scenario ogtt3 -data /inputs/test_data_ogtt3_with_params.json -json ogtt3_out.json -image ogtt3_out.png
 
----
+docker run --rm -v "${PWD}/inputs:/inputs" -v "${PWD}/outputs:/outputs" edes-universal:latest -scenario ogtt4 -data /inputs/test_data_ogtt4.json -json ogtt4_out.json -image ogtt4_out.png
+docker run --rm -v "${PWD}/inputs:/inputs" -v "${PWD}/outputs:/outputs" edes-universal:latest -scenario ogtt4 -data /inputs/test_data_ogtt4_with_params.json -json ogtt4_out.json -image ogtt4_out.png
 
-### Setting up VSCode
-Julia was found to work the best using the VSCode IDE, which you can download [here](https://code.visualstudio.com/download). After downloading and installing VSCode, navigate to the VSCode marketplace, which has the following icon:
-
-<img width="54" alt="VSCode Marketplace" src="https://github.com/Computational-Biology-TUe/Julia-sysbio-workshop/assets/54850292/4f1ce454-ce4e-47c4-8a92-bfc636e48140">
-
-Type `Julia` in the search bar and install the Julia Language Support extension. 
-
----
-
-### Setting up the workshop environment
-After installing Julia, you can either fork this repository to your own Github account and download the code from there, or download the code directly from this repository into a Zip-file by selecting `Code` -> `Download ZIP`. 
-
-Put the workshop code in a nice folder and open this folder from VSCode.
-
-Now there are two ways to initialize the environment. 
-
-#### 1. Use the first code block in the 01-Getting-Started file
-Uncomment the first code block in the `01-Getting-Started.ipynb` file to automatically set up the environment.
-
-#### 2. Use the VSCode terminal
-
-In case a terminal is not open yet, click `Terminal`->`New Terminal` from the top bar and execute
-```
-julia
-```
-To start the Julia REPL.
-
-Then, press `]` to change from Julia to the package manager, which is indicated by `>julia` changing to `>pkg`. Then, execute:
-```
-activate .
-```
->  **Warning**
-> Make sure to remember the dot `.` at the end of this command.
-
-To activate the workshop environment. Then execute (also from the Pkg terminal)
-```
-instantiate
 ```
 
-To install all the required packages. You should now be able to run all the notebooks in this workshop environment.
+Notes:
 
----
+- The container entrypoint is the universal runner script.
+- The container reads inputs from `/inputs`.
+- The container writes outputs to `/outputs`.
+- Relative `-json` and `-image` outputs are written to `/outputs` (mounted host folder).
+- You can also pass absolute output paths.
 
-### Troubleshooting
+## Flags
 
-#### Error opening notebooks in Windows VS Code
-In Windows, we noticed that notebooks may sometimes error when trying to open them in Visual Studio Code. This has to do with the path length limit in the Windows filesystem. The easiest fix is to place the repository folder in a directory that is higher up, so the paths will not be too long. 
+- -h, --help
+  - Show usage and examples.
 
-## References 
-[1]Maas AH, Rozendaal YJ, van Pul C, Hilbers PA, Cottaar WJ, Haak HR, van Riel NA. A physiology-based model describing heterogeneity in glucose metabolism: the core of the Eindhoven Diabetes Education Simulator (E-DES). J Diabetes Sci Technol. 2015 Mar;9(2):282-92. doi: 10.1177/1932296814562607.  
-[2] Raue A, Kreutz C, Maiwald T, Bachmann J, Schilling M, Klingmüller U, Timmer J. Structural and practical identifiability analysis of partially observed dynamical models by exploiting the profile likelihood. Bioinformatics. 2009 Aug 1;25(15):1923-9. doi: 10.1093/bioinformatics/btp358. 
+- -scenario NAME
+  - Select scenario: cgm | ogtt3 | ogtt4
+  - Default is cgm.
+
+- -data FILE
+  - Load custom data from JSON file instead of using default scenario data.
+  - JSON must contain "time", "glucose" arrays.
+  - "insulin" array is optional for cgm (uses fasting_insulin if not provided).
+  - "insulin" array is required for ogtt3 and ogtt4.
+  - Optional "parameters" field: when present, optimization is skipped.
+  - All values must be finite numbers.
+
+- -json [filename]
+  - Enable JSON output.
+  - Optional filename (default: results_<scenario>.json).
+  - Relative filenames are saved in this folder.
+
+- -image [filename]
+  - Enable PNG curve figure output.
+  - Optional filename (default: fig_<scenario>_curves.png).
+  - Relative filenames are saved in this folder.
+
+## Parameter Formats
+
+- cgm: k1,k5,k6,sigma_g,sigma_i
+- ogtt3: k1,k5,k6,sigma_g,sigma_i
+- ogtt4: k1,k5,k6,k8,sigma_g,sigma_i
+
+## Parameter Fitting with OGTT Data
+
+When the input JSON **does not include** `parameters`, the script automatically runs **parameter optimization** against the measurement data.
+
+When the input JSON **does include** `parameters`, the script validates and uses them directly, and optimization is skipped.
+
+### How Parameter Optimization Works
+
+**Optimization Algorithm**: Nelder-Mead simplex method (gradient-free)
+- Uses 300 random initial parameter guesses distributed via Latin Hypercube Sampling
+- Each guess generates a separate optimization run
+- Selects the best parameters from successful runs
+- Typical success rate: 50-70% of runs converge to valid solutions
+
+**OGTT3 and OGTT4 scenarios** fit parameters to both glucose AND insulin measurements:
+- Script loads your OGTT measurement data (glucose points + insulin points at sample times)
+- Runs optimization using multiple initial guesses  
+- Each optimization run simulates the ODE model and compares predictions to your measured data
+- Computes loss based on both glucose and insulin residuals
+- Returns parameters that best fit your experimental measurements
+
+**CGM scenario** fits to glucose measurements only (insulin is constant fasting level)
+
+### Example: OGTT3 Parameter Fitting
+
+```bash
+# Fit parameters to your OGTT3 patient data
+julia edes_universal_runner.jl -scenario ogtt3 -data patient_data.json -json fit_results.json -image fit_curves.png
+```
+
+Output shows:
+- Measurement data plotted as red dots
+- Simulated curves (blue line) fitted to your data
+- JSON file with fitted parameter values
+- Optimization statistics (successful runs, best objective value)
+
+### Performance Notes
+- OGTT optimization typically takes 2-5 minutes
+- CGM optimization may take longer due to more measurement points
+- Reduce `n_initial_guesses` value in code if speed is critical
+
+## Example Commands
+
+Help:
+
+```bash
+julia edes_universal_runner.jl --help
+```
+
+CGM optimization with JSON and image:
+
+```bash
+julia edes_universal_runner.jl -scenario cgm -json -image
+```
+
+OGTT3 with pretrained params in JSON (no optimization):
+
+```bash
+julia edes_universal_runner.jl -scenario ogtt3 -data inputs/test_data_ogtt3_with_params.json -json ogtt3_result.json
+```
+
+OGTT4 optimization with custom image name:
+
+```bash
+julia edes_universal_runner.jl -scenario ogtt4 -data inputs/test_data_ogtt4.json -image ogtt4_curves.png
+```
+
+CGM with custom data from JSON and optimization:
+
+```bash
+julia edes_universal_runner.jl -scenario cgm -data mydata.json -json -image
+```
+
+OGTT3 with custom data and optimization:
+
+```bash
+julia edes_universal_runner.jl -scenario ogtt3 -data patient_ogtt3.json -json ogtt3_fit.json
+```
+
+## Test Commands by Scenario
+
+Run these from this folder (`runnable`).
+
+### CGM
+
+Without predefined parameters (optimize from test data):
+
+```bash
+julia edes_universal_runner.jl -scenario cgm -data inputs/test_data_cgm.json -json cgm_out.json -image cgm_out.png
+```
+
+With predefined parameters in JSON (no optimization):
+
+```bash
+julia edes_universal_runner.jl -scenario cgm -data inputs/test_data_cgm_with_params.json -json cgm_predef_out.json -image cgm_predef_out.png
+```
+
+### OGTT3
+
+Without predefined parameters (optimize from test data):
+
+```bash
+julia edes_universal_runner.jl -scenario ogtt3 -data inputs/test_data_ogtt3.json -json ogtt3_out.json -image ogtt3_out.png
+```
+
+With predefined parameters in JSON (estimated OGTT3 parameters):
+
+```bash
+julia edes_universal_runner.jl -scenario ogtt3 -data inputs/test_data_ogtt3_with_params.json -json ogtt3_predef_out.json -image ogtt3_predef_out.png
+```
+
+### OGTT4
+
+Without predefined parameters (optimize from test data):
+
+```bash
+julia edes_universal_runner.jl -scenario ogtt4 -data inputs/test_data_ogtt4.json -json ogtt4_out.json -image ogtt4_out.png
+```
+
+With predefined parameters in JSON (no optimization):
+
+```bash
+julia edes_universal_runner.jl -scenario ogtt4 -data inputs/test_data_ogtt4_with_params.json -json ogtt4_predef_out.json -image ogtt4_predef_out.png
+```
+
+## JSON Data Format
+
+Custom data files should follow this structure:
+
+```json
+{
+  "time": [0, 5, 10, 15, 20, 25,...],
+  "glucose": [6.1, 6.2, 6.4, 6.7, 7.1, 7.6,...],
+  "insulin": [7.9, 7.9, 7.9, ...],
+  "fasting_insulin": 7.9,
+  "parameters": [0.01, 0.05, 3.0, 0.5, 0.3]
+}
+```
+
+- `scenario`: Optional. Can be used to auto-detect scenario type.
+- `time`: Required. Time points in minutes.
+- `glucose`: Required. Glucose measurements in mmol/L.
+- `insulin`: Optional for CGM, required for OGTT3/OGTT4. Insulin in mU/L.
+- `fasting_insulin`: Optional. Used for CGM if insulin array not provided (default: 7.9).
+- `parameters`: Optional. If present, optimization is skipped and these values are used.
+
+OGTT4 optimization with both outputs:
+
+```bash
+julia edes_universal_runner.jl -scenario ogtt4 -json -image
+```

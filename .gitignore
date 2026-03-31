@@ -1,3 +1,5 @@
 Manifest.toml
 *_smoke.json
 *_smoke.png
+/inputs/
+/outputs/
