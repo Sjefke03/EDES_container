@@ -1,0 +1,215 @@
+{
+  "ontology_id": "EDES-HDT",
+  "version_tag": "EDES-HDT-1.0.0",
+  "description": "Ontology term catalogue for the Extended Dartmouth-Exeter Simulator (EDES) glucose-insulin model. Covers inputs, outputs, diagnoses, and advices.",
+  "terms": [
+    {
+      "type": "INPUT",
+      "ontology_term_code": "14749-6",
+      "system": "LOINC",
+      "name": "Plasma Glucose Time Series",
+      "description": "Continuous glucose monitor (CGM) or oral glucose tolerance test (OGTT) plasma glucose measurements over time.",
+      "data_type": "TimeSeries",
+      "unit": "mmol/L",
+      "required": true,
+      "format": { "timestamps_min": "array of float", "values": "array of float" }
+    },
+    {
+      "type": "INPUT",
+      "ontology_term_code": "20448-7",
+      "system": "LOINC",
+      "name": "Fasting Plasma Insulin",
+      "description": "Baseline fasting plasma insulin concentration used to initialise the EDES model.",
+      "data_type": "Scalar",
+      "unit": "mU/L",
+      "required": true,
+      "format": { "value": "float" }
+    },
+    {
+      "type": "INPUT",
+      "ontology_term_code": "29463-7",
+      "system": "LOINC",
+      "name": "Body Weight",
+      "description": "Patient body weight used to scale volume of distribution parameters.",
+      "data_type": "Scalar",
+      "unit": "kg",
+      "required": false,
+      "format": { "value": "float" }
+    },
+    {
+      "type": "INPUT",
+      "ontology_term_code": "HDT-EDES-MEAL-DOSE",
+      "system": "HDT-CUSTOM",
+      "name": "Oral Glucose Dose",
+      "description": "Glucose load administered during an OGTT (default 75 g = 75000 mg).",
+      "data_type": "Scalar",
+      "unit": "mg",
+      "required": false,
+      "format": { "value": "float" }
+    },
+    {
+      "type": "INPUT",
+      "ontology_term_code": "HDT-EDES-SCENARIO",
+      "system": "HDT-CUSTOM",
+      "name": "Run Scenario",
+      "description": "Selects the EDES model configuration: 'cgm' (continuous glucose only), 'ogtt3' (3-parameter OGTT with fixed k8), or 'ogtt4' (4-parameter OGTT with free k8).",
+      "data_type": "Categorical",
+      "unit": null,
+      "required": true,
+      "allowed_values": ["cgm", "ogtt3", "ogtt4"]
+    },
+    {
+      "type": "INPUT",
+      "ontology_term_code": "HDT-EDES-PARAMS",
+      "system": "HDT-CUSTOM",
+      "name": "Pre-Trained Parameters",
+      "description": "Optional pre-fitted EDES parameter set. When provided, parameter optimisation is skipped and the supplied values are used directly.",
+      "data_type": "Object",
+      "unit": null,
+      "required": false,
+      "format": { "k1": "float", "k5": "float", "k6": "float", "sigma_g": "float", "sigma_i": "float" }
+    },
+    {
+      "type": "INPUT",
+      "ontology_term_code": "HDT-EDES-INSULIN",
+      "system": "HDT-CUSTOM",
+      "name": "Plasma Insulin Time Series",
+      "description": "Plasma insulin measurements over time, required for ogtt3/ogtt4 scenarios to fit both glucose and insulin dynamics.",
+      "data_type": "TimeSeries",
+      "unit": "mU/L",
+      "required": false,
+      "format": { "timestamps_min": "array of float", "values": "array of float" }
+    },
+    {
+      "type": "OUTPUT",
+      "ontology_term_code": "HDT-EDES-PLASMA-GLUCOSE",
+      "system": "HDT-CUSTOM",
+      "name": "Simulated Plasma Glucose Trajectory",
+      "description": "Model-simulated plasma glucose concentration over 240 minutes following a meal or glucose load.",
+      "data_type": "TimeSeries",
+      "unit": "mmol/L",
+      "required": true,
+      "format": { "timestamps_min": "array of float", "values": "array of float" }
+    },
+    {
+      "type": "OUTPUT",
+      "ontology_term_code": "HDT-EDES-PLASMA-INSULIN",
+      "system": "HDT-CUSTOM",
+      "name": "Simulated Plasma Insulin Trajectory",
+      "description": "Model-simulated plasma insulin concentration over 240 minutes.",
+      "data_type": "TimeSeries",
+      "unit": "mU/L",
+      "required": true,
+      "format": { "timestamps_min": "array of float", "values": "array of float" }
+    },
+    {
+      "type": "OUTPUT",
+      "ontology_term_code": "HDT-EDES-GUT-GLUCOSE",
+      "system": "HDT-CUSTOM",
+      "name": "Gut Glucose Absorption",
+      "description": "Model-simulated glucose mass in the gut compartment over time.",
+      "data_type": "TimeSeries",
+      "unit": "mg",
+      "required": true,
+      "format": { "timestamps_min": "array of float", "values": "array of float" }
+    },
+    {
+      "type": "OUTPUT",
+      "ontology_term_code": "HDT-EDES-INTERSTITIUM-INSULIN",
+      "system": "HDT-CUSTOM",
+      "name": "Interstitium Insulin",
+      "description": "Model-simulated interstitial insulin concentration (remote compartment) over time.",
+      "data_type": "TimeSeries",
+      "unit": "mU/L",
+      "required": true,
+      "format": { "timestamps_min": "array of float", "values": "array of float" }
+    },
+    {
+      "type": "OUTPUT",
+      "ontology_term_code": "HDT-EDES-FIT-PARAMS",
+      "system": "HDT-CUSTOM",
+      "name": "Fitted or Used Model Parameters",
+      "description": "EDES parameter values used for the simulation — either optimised from data or supplied as pre-trained inputs.",
+      "data_type": "Object",
+      "unit": null,
+      "required": true,
+      "format": { "k1": "float", "k5": "float", "k6": "float", "sigma_g": "float", "sigma_i": "float" }
+    },
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "9414007",
+      "system": "SNOMED-CT",
+      "name": "Impaired Glucose Tolerance",
+      "description": "Peak simulated 2-hour plasma glucose between 7.8 and 11.1 mmol/L, consistent with impaired glucose tolerance (pre-diabetes).",
+      "threshold_low": 7.8,
+      "threshold_high": 11.1,
+      "unit": "mmol/L",
+      "required": false
+    },
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "44054006",
+      "system": "SNOMED-CT",
+      "name": "Type 2 Diabetes Mellitus Risk",
+      "description": "Peak simulated 2-hour plasma glucose at or above 11.1 mmol/L, indicating elevated Type 2 diabetes mellitus risk.",
+      "threshold": 11.1,
+      "unit": "mmol/L",
+      "required": false
+    },
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "HDT-DIAG-ELEVATED-FASTING-GLUCOSE",
+      "system": "HDT-CUSTOM",
+      "name": "Elevated Fasting Glucose",
+      "description": "Fasting plasma glucose (first data point) above 6.1 mmol/L.",
+      "threshold": 6.1,
+      "unit": "mmol/L",
+      "required": false
+    },
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "HDT-DIAG-NORMAL-GLUCOSE",
+      "system": "HDT-CUSTOM",
+      "name": "Normal Glucose Regulation",
+      "description": "Fasting glucose at or below 6.1 mmol/L AND peak simulated glucose below 7.8 mmol/L.",
+      "unit": "mmol/L",
+      "required": false
+    },
+    {
+      "type": "ADVICE",
+      "ontology_term_code": "HDT-ADVICE-MONITOR-GLUCOSE",
+      "system": "HDT-CUSTOM",
+      "name": "Increase Glucose Monitoring Frequency",
+      "description": "Increase the frequency of continuous glucose monitoring. Triggered when Impaired Glucose Tolerance is detected.",
+      "trigger": "9414007",
+      "required": false
+    },
+    {
+      "type": "ADVICE",
+      "ontology_term_code": "HDT-ADVICE-REDUCE-CARBS",
+      "system": "HDT-CUSTOM",
+      "name": "Reduce Carbohydrate Intake",
+      "description": "Reduce dietary carbohydrate intake to lower post-meal glucose excursions. Triggered when Type 2 diabetes risk is detected.",
+      "trigger": "44054006",
+      "required": false
+    },
+    {
+      "type": "ADVICE",
+      "ontology_term_code": "HDT-ADVICE-INCREASE-ACTIVITY",
+      "system": "HDT-CUSTOM",
+      "name": "Increase Physical Activity",
+      "description": "Increase aerobic physical activity to improve insulin sensitivity and glucose tolerance. Triggered when Impaired Glucose Tolerance is detected.",
+      "trigger": "9414007",
+      "required": false
+    },
+    {
+      "type": "ADVICE",
+      "ontology_term_code": "HDT-ADVICE-CONSULT-HCP",
+      "system": "HDT-CUSTOM",
+      "name": "Consult Healthcare Provider",
+      "description": "Consult a healthcare provider for further clinical evaluation and management. Triggered when Type 2 diabetes risk is detected.",
+      "trigger": "44054006",
+      "required": false
+    }
+  ]
+}
