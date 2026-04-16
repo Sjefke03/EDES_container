@@ -128,34 +128,27 @@ Help:
 julia edes_universal_runner.jl --help
 ```
 
-CGM optimization with JSON and image:
+CGM with and without pretrained params in JSON:
 
 ```bash
-julia edes_universal_runner.jl -scenario cgm -json -image
+julia edes_universal_runner.jl -scenario cgm -data test_data_cgm_with_params.json -json cgm_result.json
+julia edes_universal_runner.jl -scenario cgm -data test_data_cgm.json -json cgm_result.json
+
 ```
 
-OGTT3 with pretrained params in JSON (no optimization):
+OGTT3 with and without pretrained params in JSON:
 
 ```bash
-julia edes_universal_runner.jl -scenario ogtt3 -data inputs/test_data_ogtt3_with_params.json -json ogtt3_result.json
+julia edes_universal_runner.jl -scenario ogtt3 -data test_data_ogtt3_with_params.json -json ogtt3_result.json
+julia edes_universal_runner.jl -scenario ogtt3 -data test_data_ogtt3.json -json ogtt3_result.json
+
 ```
 
-OGTT4 optimization with custom image name:
+OGTT4 with and without pretrained params in JSON:
 
 ```bash
-julia edes_universal_runner.jl -scenario ogtt4 -data inputs/test_data_ogtt4.json -image ogtt4_curves.png
-```
-
-CGM with custom data from JSON and optimization:
-
-```bash
-julia edes_universal_runner.jl -scenario cgm -data mydata.json -json -image
-```
-
-OGTT3 with custom data and optimization:
-
-```bash
-julia edes_universal_runner.jl -scenario ogtt3 -data patient_ogtt3.json -json ogtt3_fit.json
+julia edes_universal_runner.jl -scenario ogtt4 -data test_data_ogtt4_with_params.json -json ogtt4_result.json
+julia edes_universal_runner.jl -scenario ogtt4 -data test_data_ogtt4.json -json ogtt4_result.json
 ```
 
 ## Test Commands by Scenario
