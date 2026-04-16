@@ -43,7 +43,7 @@ if isfile(data_path)
     try
         _peek = JSON.parsefile(data_path)
         if haskey(_peek, "HDT-EDES-SCENARIO")
-            scenario = lowercase(strip(string(_peek["HDT-EDES-SCENARIO"])))
+            global scenario = lowercase(strip(string(_peek["HDT-EDES-SCENARIO"])))
             println("[INFO] Scenario overridden from input payload: $scenario")
         else
             println("[WARN] HDT-EDES-SCENARIO not found in input JSON — using CLI default: $scenario")

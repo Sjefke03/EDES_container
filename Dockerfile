@@ -1,8 +1,8 @@
-FROM julia:1.9-bookworm
+FROM julia:1.12
 
 WORKDIR /app
 
-COPY Project.toml /app/Project.toml
+COPY Project.toml Manifest.toml /app/
 RUN julia --project=/app -e "import Pkg; Pkg.instantiate()"
 
 COPY . .

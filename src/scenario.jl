@@ -26,7 +26,7 @@ function build_scenario_data(scenario::String, custom_data::Union{Nothing, Matri
             "ub" => [0.1, 0.15, 5.0, 2.0, 50.0],
             "save_idxs" => [2],
             "uses_insulin_data" => false,
-            "n_initial_guesses" => 200,
+            "n_initial_guesses" => 300,
         )
     elseif scenario == "ogtt3"
         if custom_data === nothing
@@ -76,7 +76,7 @@ function build_scenario_data(scenario::String, custom_data::Union{Nothing, Matri
             "ub" => [0.1, 0.15, 5.0, 25.0, 2.0, 50.0],
             "save_idxs" => [2, 3],
             "uses_insulin_data" => true,
-            "n_initial_guesses" => 1000,
+            "n_initial_guesses" => 300,
         )
     else
         error("Unknown scenario '$scenario'. Use one of: cgm, ogtt3, ogtt4")

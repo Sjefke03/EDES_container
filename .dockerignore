@@ -1,6 +1,5 @@
 .git
 .gitignore
-Manifest.toml
 **/.DS_Store
 **/__pycache__/
 **/*.pyc
