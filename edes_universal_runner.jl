@@ -31,9 +31,15 @@ cli = parse_cli(ARGS)
 
 input_dir = get(ENV, "EDES_INPUT_DIR", joinpath(@__DIR__, "inputs"))
 
-# Always load scenario data from input files (defaults to test_data_<scenario>.json)
-data_file = cli.data_file === nothing ? default_data_filename(cli.scenario) : cli.data_file
-data_path = resolve_input_path(input_dir, data_file)
+# Check for input.json (docker runner mode) — overrides CLI data_file and scenario
+input_json_candidate = joinpath(input_dir, "input.json")
+if isfile(input_json_candidate) && cli.data_file === nothing
+    data_path = input_json_candidate
+else
+    data_file = cli.data_file === nothing ? default_data_filename(cli.scenario) : cli.data_file
+    data_path = resolve_input_path(input_dir, data_file)
+end
+
 println("[INFO] Loading data from: $data_path")
 
 # When running via the platform the scenario is carried inside the input JSON
@@ -140,6 +146,94 @@ output_dir = get(ENV, "EDES_OUTPUT_DIR", joinpath(@__DIR__, "outputs"))
 default_json_name = "results_$(cfg["scenario"]).json"
 default_image_name = "fig_$(cfg["scenario"])_curves.png"
 
+# Build parameter dict for outputs
+param_dict = Dict{String, Float64}()
+for (name, value) in zip(cfg["param_names"], final_params)
+    param_dict[name] = value
+end
+
+# Compute diagnoses
+fasting_glucose = data[2, 1]
+peak_glucose    = maximum(solution[2, :])
+
+diagnoses = Dict{String, Any}[]
+if peak_glucose >= 11.1
+    push!(diagnoses, Dict("ontology_term_code" => "44054006",
+                          "name" => "Type 2 Diabetes Mellitus Risk",
+                          "present" => true,
+                          "evidence" => "Peak simulated plasma glucose $(round(peak_glucose, digits=2)) mmol/L (>= 11.1)"))
+elseif peak_glucose >= 7.8
+    push!(diagnoses, Dict("ontology_term_code" => "9414007",
+                          "name" => "Impaired Glucose Tolerance",
+                          "present" => true,
+                          "evidence" => "Peak simulated plasma glucose $(round(peak_glucose, digits=2)) mmol/L (7.8–11.1 range)"))
+else
+    push!(diagnoses, Dict("ontology_term_code" => "HDT-DIAG-NORMAL-GLUCOSE",
+                          "name" => "Normal Glucose Regulation",
+                          "present" => true,
+                          "evidence" => "Peak $(round(peak_glucose, digits=2)) mmol/L < 7.8 and fasting $(round(fasting_glucose, digits=2)) mmol/L <= 6.1"))
+end
+if fasting_glucose > 6.1
+    push!(diagnoses, Dict("ontology_term_code" => "HDT-DIAG-ELEVATED-FASTING-GLUCOSE",
+                          "name" => "Elevated Fasting Glucose",
+                          "present" => true,
+                          "evidence" => "Fasting glucose $(round(fasting_glucose, digits=2)) mmol/L > 6.1"))
+end
+
+# Compute advices
+advices = Dict{String, Any}[]
+if peak_glucose >= 11.1
+    push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-CONSULT-HCP",
+                        "name" => "Consult Healthcare Provider",
+                        "message" => "Consult a healthcare provider for further clinical evaluation and management."))
+    push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-REDUCE-CARBS",
+                        "name" => "Reduce Carbohydrate Intake",
+                        "message" => "Reduce dietary carbohydrate intake to lower post-meal glucose excursions."))
+elseif peak_glucose >= 7.8
+    push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-INCREASE-ACTIVITY",
+                        "name" => "Increase Physical Activity",
+                        "message" => "Increase aerobic physical activity to improve insulin sensitivity and glucose tolerance."))
+    push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-MONITOR-GLUCOSE",
+                        "name" => "Increase Monitoring Frequency",
+                        "message" => "Increase the frequency of continuous glucose monitoring."))
+end
+
+# Always write ontology-coded output.json to EDES_OUTPUT_DIR
+ontology_payload = Dict(
+    "outputs" => Dict(
+        "HDT-EDES-PLASMA-GLUCOSE" => Dict(
+            "timestamps_min" => collect(solution.t),
+            "values"         => collect(solution[2, :]),
+            "unit"           => "mmol/L",
+        ),
+        "HDT-EDES-PLASMA-INSULIN" => Dict(
+            "timestamps_min" => collect(solution.t),
+            "values"         => collect(solution[3, :]),
+            "unit"           => "mU/L",
+        ),
+        "HDT-EDES-GUT-GLUCOSE" => Dict(
+            "timestamps_min" => collect(solution.t),
+            "values"         => collect(solution[1, :]),
+            "unit"           => "mg",
+        ),
+        "HDT-EDES-INTERSTITIUM-INSULIN" => Dict(
+            "timestamps_min" => collect(solution.t),
+            "values"         => collect(solution[4, :]),
+            "unit"           => "mU/L",
+        ),
+        "HDT-EDES-FIT-PARAMS" => param_dict,
+    ),
+    "diagnoses" => diagnoses,
+    "advices"   => advices,
+)
+
+mkpath(output_dir)
+output_json_path = joinpath(output_dir, "output.json")
+open(output_json_path, "w") do f
+    write(f, JSON.json(ontology_payload, 2))
+end
+println("[OK] output.json saved: $output_json_path")
+
 if cli.emit_json
     json_name = isempty(cli.json_filename) ? default_json_name : cli.json_filename
     json_path = resolve_output_path(output_dir, json_name)
@@ -190,11 +284,11 @@ if cli.emit_json
     )
 
     open(json_path, "w") do fjson
-        write(fjson, JSON.json(payload, 2))
+        write(fjson, JSON.json(legacy_payload, 2))
     end
-    println("[OK] JSON saved: $json_path")
+    println("[OK] Legacy JSON saved: $json_path")
 else
-    println("[INFO] JSON output disabled. Use -json to enable it.")
+    println("[INFO] Legacy JSON output disabled. Use -json to enable it.")
 end
 
 if cli.emit_image
