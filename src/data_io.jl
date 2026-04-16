@@ -66,3 +66,8 @@ function load_data_json(filepath::String, scenario_hint::String)
     # Return matrix compatible with build_scenario_data format and optional parameters
     return convert(Matrix{Float64}, [time_data'; glucose_data'; insulin_data']), params_from_json
 end
+
+function load_ontology(path::String)
+    isfile(path) || error("ontology.json not found at: $path")
+    return JSON.parsefile(path)
+end

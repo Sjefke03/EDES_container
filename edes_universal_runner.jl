@@ -20,6 +20,8 @@ include(joinpath(@__DIR__, "src", "model.jl"))
 include(joinpath(@__DIR__, "src", "loss.jl"))
 include(joinpath(@__DIR__, "src", "cli.jl"))
 include(joinpath(@__DIR__, "src", "data_io.jl"))
+include(joinpath(@__DIR__, "src", "metrics.jl"))
+include(joinpath(@__DIR__, "src", "diagnoses.jl"))
 
 # -----------------------------------------------------------------------------
 # Main execution
@@ -111,6 +113,11 @@ solution = solve(prob, ode_solver, p = construct_parameters(final_params, consta
                  u0 = [0.0, data[2, 1], data[3, 1], 0.0])
 println("[OK] Simulation complete for $(length(solution.t)) time points")
 
+ontology = load_ontology(joinpath(@__DIR__, "ontology.json"))
+metrics  = compute_metrics(solution, data, cfg, final_params)
+diagnoses = compute_diagnoses(metrics, cfg)
+println("[OK] Metrics and diagnoses computed")
+
 output_dir = get(ENV, "EDES_OUTPUT_DIR", joinpath(@__DIR__, "outputs"))
 default_json_name = "results_$(cfg["scenario"]).json"
 default_image_name = "fig_$(cfg["scenario"])_curves.png"
@@ -135,10 +142,24 @@ if cli.emit_json
             "plasma_insulin" => collect(solution[3, :]),
             "interstitium_insulin" => collect(solution[4, :]),
         ),
+        "simulation_at_data_timepoints" => Dict(
+            "time"                 => vec(data[1, :]),
+            "gut_glucose"          => [solution(Float64(t))[1] for t in data[1, :]],
+            "plasma_glucose"       => [solution(Float64(t))[2] for t in data[1, :]],
+            "plasma_insulin"       => [solution(Float64(t))[3] for t in data[1, :]],
+            "interstitium_insulin" => [solution(Float64(t))[4] for t in data[1, :]],
+        ),
         "data" => Dict(
             "time" => vec(data[1, :]),
             "glucose" => vec(data[2, :]),
             "insulin" => vec(data[3, :]),
+        ),
+        "metrics"   => metrics,
+        "diagnoses" => diagnoses,
+        "ontology_ref" => Dict(
+            "version" => ontology["version"],
+            "file"    => "ontology.json",
+            "model"   => ontology["model"],
         ),
     )
 

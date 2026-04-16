@@ -1,0 +1,180 @@
+{
+  "version": "1.0.0",
+  "model": "EDES (Extended De Esposito Glucose-Insulin System)",
+  "description": "Semantic ontology mapping state variables, parameters, metrics, and diagnoses to organs and physiological processes for the EDES glucose-insulin simulation model.",
+  "organs": [
+    "stomach",
+    "small_intestine",
+    "gastrointestinal_tract",
+    "liver",
+    "blood",
+    "vasculature",
+    "muscle",
+    "adipose_tissue",
+    "kidney",
+    "pancreas",
+    "interstitial_fluid"
+  ],
+  "state_variables": {
+    "gut_glucose": {
+      "symbol": "G_gut",
+      "unit": "mg",
+      "ode_index": 1,
+      "organs": ["stomach", "small_intestine", "gastrointestinal_tract"],
+      "process": "gastric_emptying_and_intestinal_absorption"
+    },
+    "plasma_glucose": {
+      "symbol": "G_pl",
+      "unit": "mmol/L",
+      "ode_index": 2,
+      "organs": ["blood", "vasculature", "liver", "muscle", "kidney"],
+      "process": "systemic_glucose_regulation"
+    },
+    "plasma_insulin": {
+      "symbol": "I_pl",
+      "unit": "mU/L",
+      "ode_index": 3,
+      "organs": ["pancreas", "blood", "liver"],
+      "process": "insulin_secretion_and_hepatic_clearance"
+    },
+    "interstitium_insulin": {
+      "symbol": "I_rem",
+      "unit": "mU/L",
+      "ode_index": 4,
+      "organs": ["muscle", "adipose_tissue", "interstitial_fluid"],
+      "process": "insulin_distribution_to_periphery"
+    }
+  },
+  "parameters": {
+    "k1":  { "organs": ["stomach", "small_intestine"],         "process": "gastric_emptying_rate",                    "description": "Weibull rate for gastric emptying" },
+    "k2":  { "organs": ["small_intestine"],                    "process": "intestinal_absorption",                    "description": "Gut absorption rate constant" },
+    "k3":  { "organs": ["liver"],                              "process": "hepatic_glucose_uptake",                   "description": "Hepatic glucose clearance rate" },
+    "k4":  { "organs": ["liver"],                              "process": "insulin_suppressed_EGP",                   "description": "Insulin-mediated EGP suppression" },
+    "k5":  { "organs": ["muscle", "adipose_tissue"],           "process": "peripheral_glucose_uptake",                "description": "Insulin-mediated peripheral glucose disposal" },
+    "k6":  { "organs": ["pancreas"],                           "process": "glucose_stimulated_insulin_secretion",     "description": "Proportional insulin secretion gain" },
+    "k7":  { "organs": ["pancreas", "liver"],                  "process": "basal_insulin_turnover",                   "description": "Basal insulin secretion/clearance rate" },
+    "k8":  { "organs": ["pancreas"],                           "process": "derivative_insulin_secretion",             "description": "Derivative (rate-sensitive) insulin secretion" },
+    "k9":  { "organs": ["blood", "interstitial_fluid"],        "process": "insulin_distribution",                    "description": "Plasma-to-interstitium insulin transfer" },
+    "k10": { "organs": ["muscle", "adipose_tissue"],           "process": "insulin_degradation",                     "description": "Interstitial insulin degradation" }
+  },
+  "metrics": {
+    "time_in_range_percent": {
+      "organs": ["blood"],
+      "reference": "ADA 2023 CGM guidelines",
+      "normal_range": ">= 70%"
+    },
+    "iauc_glucose": {
+      "organs": ["blood", "liver"],
+      "reference": "OGTT AUC analysis",
+      "description": "Incremental glucose AUC above fasting"
+    },
+    "homa_ir": {
+      "organs": ["liver", "muscle", "pancreas"],
+      "reference": "Matthews et al. 1985",
+      "normal_range": "< 2.0"
+    },
+    "insulinogenic_index": {
+      "organs": ["pancreas"],
+      "reference": "Wareham et al. 1995",
+      "normal_range": ">= 0.4",
+      "applicable_scenarios": ["ogtt3", "ogtt4"]
+    },
+    "isi_matsuda_approx": {
+      "organs": ["muscle", "adipose_tissue", "liver"],
+      "reference": "Matsuda & DeFronzo 1999",
+      "description": "Whole-body insulin sensitivity index"
+    },
+    "disposition_index": {
+      "organs": ["pancreas", "muscle"],
+      "reference": "Bergman et al.",
+      "description": "Beta-cell compensation for insulin resistance",
+      "applicable_scenarios": ["ogtt3", "ogtt4"]
+    }
+  },
+  "diagnoses": {
+    "glucose_tolerance": {
+      "NGT": {
+        "name": "Normal Glucose Tolerance",
+        "organs": ["blood", "pancreas", "liver", "muscle"],
+        "criteria": "fasting < 5.6 mmol/L AND 2h < 7.8 mmol/L",
+        "reference": "WHO 2006 / ADA 2023"
+      },
+      "IFG": {
+        "name": "Impaired Fasting Glucose",
+        "organs": ["liver"],
+        "criteria": "fasting 5.6-6.9 mmol/L",
+        "reference": "ADA 2023"
+      },
+      "IGT": {
+        "name": "Impaired Glucose Tolerance",
+        "organs": ["muscle", "adipose_tissue"],
+        "criteria": "2h 7.8-11.0 mmol/L",
+        "reference": "WHO 2006",
+        "applicable_scenarios": ["ogtt3", "ogtt4"]
+      },
+      "T2D": {
+        "name": "Type 2 Diabetes (simulated flag)",
+        "organs": ["pancreas", "muscle", "liver"],
+        "criteria": "fasting >= 7.0 OR 2h >= 11.1 mmol/L",
+        "reference": "ADA 2023"
+      }
+    },
+    "insulin_resistance": {
+      "Normal_IR": {
+        "name": "Normal Insulin Sensitivity",
+        "organs": ["muscle", "adipose_tissue", "liver"],
+        "criteria": "HOMA-IR < 2.0"
+      },
+      "Borderline_IR": {
+        "name": "Borderline Insulin Resistance",
+        "organs": ["muscle", "adipose_tissue", "liver"],
+        "criteria": "HOMA-IR 2.0-3.0"
+      },
+      "Insulin_Resistant": {
+        "name": "Insulin Resistance",
+        "organs": ["muscle", "adipose_tissue", "liver"],
+        "criteria": "HOMA-IR > 3.0"
+      }
+    },
+    "beta_cell_function": {
+      "Normal_BCF": {
+        "name": "Normal Beta-cell Function",
+        "organs": ["pancreas"],
+        "criteria": "insulinogenic_index >= 0.4",
+        "applicable_scenarios": ["ogtt3", "ogtt4"]
+      },
+      "Reduced_BCF": {
+        "name": "Reduced Beta-cell Function",
+        "organs": ["pancreas"],
+        "criteria": "insulinogenic_index 0.2-0.4",
+        "applicable_scenarios": ["ogtt3", "ogtt4"]
+      },
+      "Impaired_BCF": {
+        "name": "Impaired Beta-cell Function",
+        "organs": ["pancreas"],
+        "criteria": "insulinogenic_index < 0.2",
+        "applicable_scenarios": ["ogtt3", "ogtt4"]
+      }
+    },
+    "glycemic_control": {
+      "Good_Control": {
+        "name": "Good Glycemic Control",
+        "organs": ["blood"],
+        "criteria": "TIR >= 70%",
+        "applicable_scenarios": ["cgm"]
+      },
+      "Suboptimal_Control": {
+        "name": "Suboptimal Glycemic Control",
+        "organs": ["blood"],
+        "criteria": "TIR 50-70%",
+        "applicable_scenarios": ["cgm"]
+      },
+      "Poor_Control": {
+        "name": "Poor Glycemic Control",
+        "organs": ["blood"],
+        "criteria": "TIR < 50%",
+        "applicable_scenarios": ["cgm"]
+      }
+    }
+  }
+}
