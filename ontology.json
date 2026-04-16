@@ -1,180 +1,296 @@
 {
-  "version": "1.0.0",
-  "model": "EDES (Extended De Esposito Glucose-Insulin System)",
-  "description": "Semantic ontology mapping state variables, parameters, metrics, and diagnoses to organs and physiological processes for the EDES glucose-insulin simulation model.",
-  "organs": [
-    "stomach",
-    "small_intestine",
-    "gastrointestinal_tract",
-    "liver",
-    "blood",
-    "vasculature",
-    "muscle",
-    "adipose_tissue",
-    "kidney",
-    "pancreas",
-    "interstitial_fluid"
-  ],
-  "state_variables": {
-    "gut_glucose": {
-      "symbol": "G_gut",
-      "unit": "mg",
-      "ode_index": 1,
-      "organs": ["stomach", "small_intestine", "gastrointestinal_tract"],
-      "process": "gastric_emptying_and_intestinal_absorption"
-    },
-    "plasma_glucose": {
-      "symbol": "G_pl",
+  "ontology_id": "EDES-HDT",
+  "version_tag": "EDES-HDT-2.0.0",
+  "description": "Ontology term catalogue for the Extended Dartmouth-Exeter Simulator (EDES) glucose-insulin model, v2.0.0. Scoped to the ogtt4 scenario (free k8 parameter, joint glucose+insulin fitting). Covers inputs, outputs, diagnoses, and advices.",
+  "terms": [
+    {
+      "type": "INPUT",
+      "ontology_term_code": "14749-6",
+      "system": "LOINC",
+      "name": "Plasma Glucose Time Series",
+      "description": "Oral glucose tolerance test (OGTT) plasma glucose measurements over time.",
+      "data_type": "TimeSeries",
       "unit": "mmol/L",
-      "ode_index": 2,
-      "organs": ["blood", "vasculature", "liver", "muscle", "kidney"],
-      "process": "systemic_glucose_regulation"
+      "required": true,
+      "format": { "timestamps_min": "array of float", "values": "array of float" }
     },
-    "plasma_insulin": {
-      "symbol": "I_pl",
+    {
+      "type": "INPUT",
+      "ontology_term_code": "20448-7",
+      "system": "LOINC",
+      "name": "Plasma Insulin Time Series",
+      "description": "Plasma insulin measurements. For ogtt3/ogtt4: time series format {timestamps_min, values}. For cgm: scalar format {value: float} representing fasting baseline insulin.",
+      "data_type": "TimeSeries",
       "unit": "mU/L",
-      "ode_index": 3,
-      "organs": ["pancreas", "blood", "liver"],
-      "process": "insulin_secretion_and_hepatic_clearance"
+      "required": true,
+      "format": { "timestamps_min": "array of float", "values": "array of float" }
     },
-    "interstitium_insulin": {
-      "symbol": "I_rem",
+    {
+      "type": "INPUT",
+      "ontology_term_code": "29463-7",
+      "system": "LOINC",
+      "name": "Body Weight",
+      "description": "Patient body weight used to scale volume of distribution parameters.",
+      "data_type": "Scalar",
+      "unit": "kg",
+      "required": false,
+      "format": { "value": "float" }
+    },
+    {
+      "type": "INPUT",
+      "ontology_term_code": "HDT-EDES-MEAL-DOSE",
+      "system": "HDT-CUSTOM",
+      "name": "Oral Glucose Dose",
+      "description": "Glucose load administered during an OGTT (default 75 g = 75000 mg).",
+      "data_type": "Scalar",
+      "unit": "mg",
+      "required": false,
+      "format": { "value": "float" }
+    },
+    {
+      "type": "INPUT",
+      "ontology_term_code": "HDT-EDES-SCENARIO",
+      "system": "HDT-CUSTOM",
+      "name": "Run Scenario",
+      "description": "Selects the EDES model configuration. In v2.0.0 only 'ogtt4' (4-parameter OGTT with free k8) is supported.",
+      "data_type": "Categorical",
+      "unit": null,
+      "required": true,
+      "allowed_values": ["ogtt4"]
+    },
+    {
+      "type": "INPUT",
+      "ontology_term_code": "HDT-EDES-PARAMS",
+      "system": "HDT-CUSTOM",
+      "name": "Pre-Trained Parameters",
+      "description": "Optional pre-fitted EDES parameter set for ogtt4. When provided, parameter optimisation is skipped. Includes free k8 parameter.",
+      "data_type": "Object",
+      "unit": null,
+      "required": false,
+      "format": { "k1": "float", "k5": "float", "k6": "float", "k8": "float", "sigma_g": "float", "sigma_i": "float" }
+    },
+    {
+      "type": "OUTPUT",
+      "ontology_term_code": "HDT-EDES-PLASMA-GLUCOSE",
+      "system": "HDT-CUSTOM",
+      "name": "Simulated Plasma Glucose Trajectory",
+      "description": "Model-simulated plasma glucose concentration over 240 minutes following a glucose load.",
+      "data_type": "TimeSeries",
+      "unit": "mmol/L",
+      "required": true,
+      "format": { "timestamps_min": "array of float", "values": "array of float" }
+    },
+    {
+      "type": "OUTPUT",
+      "ontology_term_code": "HDT-EDES-PLASMA-INSULIN",
+      "system": "HDT-CUSTOM",
+      "name": "Simulated Plasma Insulin Trajectory",
+      "description": "Model-simulated plasma insulin concentration over 240 minutes.",
+      "data_type": "TimeSeries",
       "unit": "mU/L",
-      "ode_index": 4,
-      "organs": ["muscle", "adipose_tissue", "interstitial_fluid"],
-      "process": "insulin_distribution_to_periphery"
-    }
-  },
-  "parameters": {
-    "k1":  { "organs": ["stomach", "small_intestine"],         "process": "gastric_emptying_rate",                    "description": "Weibull rate for gastric emptying" },
-    "k2":  { "organs": ["small_intestine"],                    "process": "intestinal_absorption",                    "description": "Gut absorption rate constant" },
-    "k3":  { "organs": ["liver"],                              "process": "hepatic_glucose_uptake",                   "description": "Hepatic glucose clearance rate" },
-    "k4":  { "organs": ["liver"],                              "process": "insulin_suppressed_EGP",                   "description": "Insulin-mediated EGP suppression" },
-    "k5":  { "organs": ["muscle", "adipose_tissue"],           "process": "peripheral_glucose_uptake",                "description": "Insulin-mediated peripheral glucose disposal" },
-    "k6":  { "organs": ["pancreas"],                           "process": "glucose_stimulated_insulin_secretion",     "description": "Proportional insulin secretion gain" },
-    "k7":  { "organs": ["pancreas", "liver"],                  "process": "basal_insulin_turnover",                   "description": "Basal insulin secretion/clearance rate" },
-    "k8":  { "organs": ["pancreas"],                           "process": "derivative_insulin_secretion",             "description": "Derivative (rate-sensitive) insulin secretion" },
-    "k9":  { "organs": ["blood", "interstitial_fluid"],        "process": "insulin_distribution",                    "description": "Plasma-to-interstitium insulin transfer" },
-    "k10": { "organs": ["muscle", "adipose_tissue"],           "process": "insulin_degradation",                     "description": "Interstitial insulin degradation" }
-  },
-  "metrics": {
-    "time_in_range_percent": {
-      "organs": ["blood"],
-      "reference": "ADA 2023 CGM guidelines",
-      "normal_range": ">= 70%"
+      "required": true,
+      "format": { "timestamps_min": "array of float", "values": "array of float" }
     },
-    "iauc_glucose": {
-      "organs": ["blood", "liver"],
-      "reference": "OGTT AUC analysis",
-      "description": "Incremental glucose AUC above fasting"
+    {
+      "type": "OUTPUT",
+      "ontology_term_code": "HDT-EDES-GUT-GLUCOSE",
+      "system": "HDT-CUSTOM",
+      "name": "Gut Glucose Absorption",
+      "description": "Model-simulated glucose mass in the gut compartment over time.",
+      "data_type": "TimeSeries",
+      "unit": "mg",
+      "required": true,
+      "format": { "timestamps_min": "array of float", "values": "array of float" }
     },
-    "homa_ir": {
-      "organs": ["liver", "muscle", "pancreas"],
+    {
+      "type": "OUTPUT",
+      "ontology_term_code": "HDT-EDES-INTERSTITIUM-INSULIN",
+      "system": "HDT-CUSTOM",
+      "name": "Interstitium Insulin",
+      "description": "Model-simulated interstitial insulin concentration (remote compartment) over time.",
+      "data_type": "TimeSeries",
+      "unit": "mU/L",
+      "required": true,
+      "format": { "timestamps_min": "array of float", "values": "array of float" }
+    },
+    {
+      "type": "OUTPUT",
+      "ontology_term_code": "HDT-EDES-FIT-PARAMS",
+      "system": "HDT-CUSTOM",
+      "name": "Fitted or Used Model Parameters",
+      "description": "EDES parameter values used for the simulation — either optimised from data or supplied as pre-trained inputs. Includes free k8 for ogtt4.",
+      "data_type": "Object",
+      "unit": null,
+      "required": true,
+      "format": { "k1": "float", "k5": "float", "k6": "float", "k8": "float", "sigma_g": "float", "sigma_i": "float" }
+    },
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "9414007",
+      "system": "SNOMED-CT",
+      "name": "Impaired Glucose Tolerance",
+      "description": "Peak simulated 2-hour plasma glucose between 7.8 and 11.1 mmol/L, consistent with impaired glucose tolerance (pre-diabetes).",
+      "threshold_low": 7.8,
+      "threshold_high": 11.1,
+      "unit": "mmol/L",
+      "required": false
+    },
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "44054006",
+      "system": "SNOMED-CT",
+      "name": "Type 2 Diabetes Mellitus Risk",
+      "description": "Peak simulated 2-hour plasma glucose at or above 11.1 mmol/L, indicating elevated Type 2 diabetes mellitus risk.",
+      "threshold": 11.1,
+      "unit": "mmol/L",
+      "required": false
+    },
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "HDT-DIAG-ELEVATED-FASTING-GLUCOSE",
+      "system": "HDT-CUSTOM",
+      "name": "Elevated Fasting Glucose",
+      "description": "Fasting plasma glucose (first data point) above 6.1 mmol/L.",
+      "threshold": 6.1,
+      "unit": "mmol/L",
+      "required": false
+    },
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "HDT-DIAG-NORMAL-GLUCOSE",
+      "system": "HDT-CUSTOM",
+      "name": "Normal Glucose Regulation",
+      "description": "Fasting glucose at or below 6.1 mmol/L AND peak simulated glucose below 7.8 mmol/L.",
+      "unit": "mmol/L",
+      "required": false
+    },
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "HDT-DIAG-INSULIN-RESISTANCE",
+      "system": "HDT-CUSTOM",
+      "name": "Insulin Resistance",
+      "description": "HOMA-IR above 3.0, indicating clinically significant insulin resistance.",
+      "threshold": 3.0,
+      "metric": "homa_ir",
+      "unit": "dimensionless",
       "reference": "Matthews et al. 1985",
-      "normal_range": "< 2.0"
+      "required": false
     },
-    "insulinogenic_index": {
-      "organs": ["pancreas"],
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "HDT-DIAG-BORDERLINE-IR",
+      "system": "HDT-CUSTOM",
+      "name": "Borderline Insulin Resistance",
+      "description": "HOMA-IR between 2.0 and 3.0, indicating borderline insulin resistance.",
+      "threshold_low": 2.0,
+      "threshold_high": 3.0,
+      "metric": "homa_ir",
+      "unit": "dimensionless",
+      "reference": "Matthews et al. 1985",
+      "required": false
+    },
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "HDT-DIAG-NORMAL-IR",
+      "system": "HDT-CUSTOM",
+      "name": "Normal Insulin Sensitivity",
+      "description": "HOMA-IR below 2.0, indicating normal insulin sensitivity.",
+      "threshold": 2.0,
+      "metric": "homa_ir",
+      "unit": "dimensionless",
+      "reference": "Matthews et al. 1985",
+      "required": false
+    },
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "HDT-DIAG-IMPAIRED-BCF",
+      "system": "HDT-CUSTOM",
+      "name": "Impaired Beta-cell Function",
+      "description": "Insulinogenic index below 0.2, indicating severely impaired beta-cell function.",
+      "threshold": 0.2,
+      "metric": "insulinogenic_index",
+      "unit": "dimensionless",
       "reference": "Wareham et al. 1995",
-      "normal_range": ">= 0.4",
-      "applicable_scenarios": ["ogtt3", "ogtt4"]
+      "required": false
     },
-    "isi_matsuda_approx": {
-      "organs": ["muscle", "adipose_tissue", "liver"],
-      "reference": "Matsuda & DeFronzo 1999",
-      "description": "Whole-body insulin sensitivity index"
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "HDT-DIAG-REDUCED-BCF",
+      "system": "HDT-CUSTOM",
+      "name": "Reduced Beta-cell Function",
+      "description": "Insulinogenic index between 0.2 and 0.4, indicating reduced beta-cell function.",
+      "threshold_low": 0.2,
+      "threshold_high": 0.4,
+      "metric": "insulinogenic_index",
+      "unit": "dimensionless",
+      "reference": "Wareham et al. 1995",
+      "required": false
     },
-    "disposition_index": {
-      "organs": ["pancreas", "muscle"],
-      "reference": "Bergman et al.",
-      "description": "Beta-cell compensation for insulin resistance",
-      "applicable_scenarios": ["ogtt3", "ogtt4"]
+    {
+      "type": "DIAGNOSIS",
+      "ontology_term_code": "HDT-DIAG-NORMAL-BCF",
+      "system": "HDT-CUSTOM",
+      "name": "Normal Beta-cell Function",
+      "description": "Insulinogenic index at or above 0.4, indicating normal beta-cell function.",
+      "threshold": 0.4,
+      "metric": "insulinogenic_index",
+      "unit": "dimensionless",
+      "reference": "Wareham et al. 1995",
+      "required": false
+    },
+    {
+      "type": "ADVICE",
+      "ontology_term_code": "HDT-ADVICE-MONITOR-GLUCOSE",
+      "system": "HDT-CUSTOM",
+      "name": "Increase Glucose Monitoring Frequency",
+      "description": "Increase the frequency of continuous glucose monitoring. Triggered when Impaired Glucose Tolerance is detected.",
+      "trigger": "9414007",
+      "required": false
+    },
+    {
+      "type": "ADVICE",
+      "ontology_term_code": "HDT-ADVICE-REDUCE-CARBS",
+      "system": "HDT-CUSTOM",
+      "name": "Reduce Carbohydrate Intake",
+      "description": "Reduce dietary carbohydrate intake to lower post-meal glucose excursions. Triggered when Type 2 diabetes risk is detected.",
+      "trigger": "44054006",
+      "required": false
+    },
+    {
+      "type": "ADVICE",
+      "ontology_term_code": "HDT-ADVICE-INCREASE-ACTIVITY",
+      "system": "HDT-CUSTOM",
+      "name": "Increase Physical Activity",
+      "description": "Increase aerobic physical activity to improve insulin sensitivity and glucose tolerance. Triggered when Impaired Glucose Tolerance is detected.",
+      "trigger": "9414007",
+      "required": false
+    },
+    {
+      "type": "ADVICE",
+      "ontology_term_code": "HDT-ADVICE-CONSULT-HCP",
+      "system": "HDT-CUSTOM",
+      "name": "Consult Healthcare Provider",
+      "description": "Consult a healthcare provider for further clinical evaluation and management. Triggered when Type 2 diabetes risk is detected.",
+      "trigger": "44054006",
+      "required": false
+    },
+    {
+      "type": "ADVICE",
+      "ontology_term_code": "HDT-ADVICE-LIFESTYLE-IR",
+      "system": "HDT-CUSTOM",
+      "name": "Lifestyle Intervention for Insulin Resistance",
+      "description": "Adopt structured lifestyle interventions (diet, exercise, weight management) to reduce insulin resistance. Triggered when insulin resistance (HOMA-IR > 3.0) is detected.",
+      "trigger": "HDT-DIAG-INSULIN-RESISTANCE",
+      "required": false
+    },
+    {
+      "type": "ADVICE",
+      "ontology_term_code": "HDT-ADVICE-BETA-CELL-FOLLOWUP",
+      "system": "HDT-CUSTOM",
+      "name": "Beta-cell Function Follow-up",
+      "description": "Schedule follow-up assessment of beta-cell function and consider specialist referral. Triggered when impaired beta-cell function (insulinogenic index < 0.2) is detected.",
+      "trigger": "HDT-DIAG-IMPAIRED-BCF",
+      "required": false
     }
-  },
-  "diagnoses": {
-    "glucose_tolerance": {
-      "NGT": {
-        "name": "Normal Glucose Tolerance",
-        "organs": ["blood", "pancreas", "liver", "muscle"],
-        "criteria": "fasting < 5.6 mmol/L AND 2h < 7.8 mmol/L",
-        "reference": "WHO 2006 / ADA 2023"
-      },
-      "IFG": {
-        "name": "Impaired Fasting Glucose",
-        "organs": ["liver"],
-        "criteria": "fasting 5.6-6.9 mmol/L",
-        "reference": "ADA 2023"
-      },
-      "IGT": {
-        "name": "Impaired Glucose Tolerance",
-        "organs": ["muscle", "adipose_tissue"],
-        "criteria": "2h 7.8-11.0 mmol/L",
-        "reference": "WHO 2006",
-        "applicable_scenarios": ["ogtt3", "ogtt4"]
-      },
-      "T2D": {
-        "name": "Type 2 Diabetes (simulated flag)",
-        "organs": ["pancreas", "muscle", "liver"],
-        "criteria": "fasting >= 7.0 OR 2h >= 11.1 mmol/L",
-        "reference": "ADA 2023"
-      }
-    },
-    "insulin_resistance": {
-      "Normal_IR": {
-        "name": "Normal Insulin Sensitivity",
-        "organs": ["muscle", "adipose_tissue", "liver"],
-        "criteria": "HOMA-IR < 2.0"
-      },
-      "Borderline_IR": {
-        "name": "Borderline Insulin Resistance",
-        "organs": ["muscle", "adipose_tissue", "liver"],
-        "criteria": "HOMA-IR 2.0-3.0"
-      },
-      "Insulin_Resistant": {
-        "name": "Insulin Resistance",
-        "organs": ["muscle", "adipose_tissue", "liver"],
-        "criteria": "HOMA-IR > 3.0"
-      }
-    },
-    "beta_cell_function": {
-      "Normal_BCF": {
-        "name": "Normal Beta-cell Function",
-        "organs": ["pancreas"],
-        "criteria": "insulinogenic_index >= 0.4",
-        "applicable_scenarios": ["ogtt3", "ogtt4"]
-      },
-      "Reduced_BCF": {
-        "name": "Reduced Beta-cell Function",
-        "organs": ["pancreas"],
-        "criteria": "insulinogenic_index 0.2-0.4",
-        "applicable_scenarios": ["ogtt3", "ogtt4"]
-      },
-      "Impaired_BCF": {
-        "name": "Impaired Beta-cell Function",
-        "organs": ["pancreas"],
-        "criteria": "insulinogenic_index < 0.2",
-        "applicable_scenarios": ["ogtt3", "ogtt4"]
-      }
-    },
-    "glycemic_control": {
-      "Good_Control": {
-        "name": "Good Glycemic Control",
-        "organs": ["blood"],
-        "criteria": "TIR >= 70%",
-        "applicable_scenarios": ["cgm"]
-      },
-      "Suboptimal_Control": {
-        "name": "Suboptimal Glycemic Control",
-        "organs": ["blood"],
-        "criteria": "TIR 50-70%",
-        "applicable_scenarios": ["cgm"]
-      },
-      "Poor_Control": {
-        "name": "Poor Glycemic Control",
-        "organs": ["blood"],
-        "criteria": "TIR < 50%",
-        "applicable_scenarios": ["cgm"]
-      }
-    }
-  }
+  ]
 }

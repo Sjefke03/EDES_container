@@ -35,10 +35,28 @@ input_dir = get(ENV, "EDES_INPUT_DIR", joinpath(@__DIR__, "inputs"))
 data_file = cli.data_file === nothing ? default_data_filename(cli.scenario) : cli.data_file
 data_path = resolve_input_path(input_dir, data_file)
 println("[INFO] Loading data from: $data_path")
-custom_data, predefined_params = load_data_json(data_path, cli.scenario)
+
+# When running via the platform the scenario is carried inside the input JSON
+# (HDT-EDES-SCENARIO field).  Use that value if present; fall back to CLI flag.
+scenario = cli.scenario
+if isfile(data_path)
+    try
+        _peek = JSON.parsefile(data_path)
+        if haskey(_peek, "HDT-EDES-SCENARIO")
+            scenario = lowercase(strip(string(_peek["HDT-EDES-SCENARIO"])))
+            println("[INFO] Scenario overridden from input payload: $scenario")
+        else
+            println("[WARN] HDT-EDES-SCENARIO not found in input JSON — using CLI default: $scenario")
+        end
+    catch e
+        println("[WARN] Could not peek scenario from $data_path: $e — using CLI default: $scenario")
+    end
+end
+
+custom_data, predefined_params = load_data_json(data_path, scenario)
 println("[INFO] Data loaded successfully: $(size(custom_data)) matrix")
 
-cfg = build_scenario_data(cli.scenario, custom_data)
+cfg = build_scenario_data(scenario, custom_data)
 constants = build_constants(cfg)
 data = cfg["data"]
 
@@ -131,35 +149,43 @@ if cli.emit_json
         param_dict[name] = value
     end
 
+    t_vec = collect(solution.t)
     payload = Dict(
-        "scenario" => cfg["scenario"],
-        "parameter_source" => (predefined_params === nothing ? "optimized" : "predefined"),
-        "parameters" => param_dict,
-        "simulation" => Dict(
-            "time" => collect(solution.t),
-            "gut_glucose" => collect(solution[1, :]),
-            "plasma_glucose" => collect(solution[2, :]),
-            "plasma_insulin" => collect(solution[3, :]),
-            "interstitium_insulin" => collect(solution[4, :]),
+        # ── Platform-standard outputs block (keyed by ontology term codes) ──
+        "outputs" => Dict(
+            "HDT-EDES-PLASMA-GLUCOSE" => Dict(
+                "timestamps_min" => t_vec,
+                "values"         => collect(solution[2, :]),
+                "unit"           => "mmol/L",
+            ),
+            "HDT-EDES-PLASMA-INSULIN" => Dict(
+                "timestamps_min" => t_vec,
+                "values"         => collect(solution[3, :]),
+                "unit"           => "mU/L",
+            ),
+            "HDT-EDES-GUT-GLUCOSE" => Dict(
+                "timestamps_min" => t_vec,
+                "values"         => collect(solution[1, :]),
+                "unit"           => "mg",
+            ),
+            "HDT-EDES-INTERSTITIUM-INSULIN" => Dict(
+                "timestamps_min" => t_vec,
+                "values"         => collect(solution[4, :]),
+                "unit"           => "mU/L",
+            ),
+            "HDT-EDES-FIT-PARAMS" => param_dict,
         ),
-        "simulation_at_data_timepoints" => Dict(
-            "time"                 => vec(data[1, :]),
-            "gut_glucose"          => [solution(Float64(t))[1] for t in data[1, :]],
-            "plasma_glucose"       => [solution(Float64(t))[2] for t in data[1, :]],
-            "plasma_insulin"       => [solution(Float64(t))[3] for t in data[1, :]],
-            "interstitium_insulin" => [solution(Float64(t))[4] for t in data[1, :]],
-        ),
-        "data" => Dict(
-            "time" => vec(data[1, :]),
-            "glucose" => vec(data[2, :]),
-            "insulin" => vec(data[3, :]),
-        ),
-        "metrics"   => metrics,
+        # ── Clinical outputs ────────────────────────────────────────────────
         "diagnoses" => diagnoses,
+        "advices"   => String[],
+        # ── Rich extras (kept for debugging / UI charts) ────────────────────
+        "metrics"          => metrics,
+        "scenario"         => cfg["scenario"],
+        "parameter_source" => (predefined_params === nothing ? "optimized" : "predefined"),
         "ontology_ref" => Dict(
-            "version" => ontology["version"],
+            "version" => ontology["version_tag"],
             "file"    => "ontology.json",
-            "model"   => ontology["model"],
+            "model"   => ontology["ontology_id"],
         ),
     )
 

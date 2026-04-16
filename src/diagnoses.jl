@@ -32,7 +32,7 @@ end
 const DISCLAIMER = "Based on simulation output, not a clinical measurement."
 
 # ---------------------------------------------------------------------------
-# Main function
+# Diagnoses
 # ---------------------------------------------------------------------------
 
 function compute_diagnoses(metrics::Dict, cfg::Dict)
@@ -46,7 +46,6 @@ function compute_diagnoses(metrics::Dict, cfg::Dict)
     two_hour   = gpl["two_hour_value_mmol_L"]
     homa_ir    = der["homa_ir"]
     ii         = der["insulinogenic_index"]   # may be nothing
-    tir        = gpl["time_in_range_3p9_to_10_percent"]
 
     # -----------------------------------------------------------------------
     # 1. Glucose tolerance
@@ -61,19 +60,16 @@ function compute_diagnoses(metrics::Dict, cfg::Dict)
                "not_applicable"
 
     if t2d_conf in ["definite", "borderline"]
-        criteria_vals = Dict("fasting_mmol_L" => fasting)
+        evidence = DISCLAIMER * " Fasting glucose: $(round(fasting, digits=1)) mmol/L."
         if is_ogtt
-            criteria_vals["two_hour_mmol_L"] = two_hour
+            evidence *= " 2-hour glucose: $(round(two_hour, digits=1)) mmol/L."
         end
         push!(diagnoses, Dict(
-            "name"              => "Type 2 Diabetes (simulated flag)",
-            "code"              => "T2D",
-            "category"          => "glucose_tolerance",
-            "ontology_ref"      => "diagnoses.glucose_tolerance.T2D",
-            "confidence"        => t2d_conf,
-            "disclaimer"        => DISCLAIMER,
-            "criteria_values"   => criteria_vals,
-            "supporting_metrics"=> ["fasting_mmol_L", is_ogtt ? "two_hour_value_mmol_L" : nothing],
+            "ontology_term_code" => "44054006",
+            "name"               => "Type 2 Diabetes Mellitus Risk",
+            "present"            => true,
+            "confidence"         => t2d_conf,
+            "evidence"           => evidence,
         ))
     else
         # IFG: fasting 5.6 – 6.9
@@ -85,14 +81,11 @@ function compute_diagnoses(metrics::Dict, cfg::Dict)
 
         if ifg_conf in ["definite", "borderline"]
             push!(diagnoses, Dict(
-                "name"              => "Impaired Fasting Glucose",
-                "code"              => "IFG",
-                "category"          => "glucose_tolerance",
-                "ontology_ref"      => "diagnoses.glucose_tolerance.IFG",
-                "confidence"        => ifg_conf,
-                "disclaimer"        => DISCLAIMER,
-                "criteria_values"   => Dict("fasting_mmol_L" => fasting),
-                "supporting_metrics"=> ["fasting_mmol_L"],
+                "ontology_term_code" => "HDT-DIAG-ELEVATED-FASTING-GLUCOSE",
+                "name"               => "Elevated Fasting Glucose",
+                "present"            => true,
+                "confidence"         => ifg_conf,
+                "evidence"           => DISCLAIMER * " Fasting glucose: $(round(fasting, digits=1)) mmol/L.",
             ))
         end
 
@@ -106,140 +99,104 @@ function compute_diagnoses(metrics::Dict, cfg::Dict)
 
             if igt_conf in ["definite", "borderline"]
                 push!(diagnoses, Dict(
-                    "name"              => "Impaired Glucose Tolerance",
-                    "code"              => "IGT",
-                    "category"          => "glucose_tolerance",
-                    "ontology_ref"      => "diagnoses.glucose_tolerance.IGT",
-                    "confidence"        => igt_conf,
-                    "disclaimer"        => DISCLAIMER,
-                    "criteria_values"   => Dict("two_hour_mmol_L" => two_hour),
-                    "supporting_metrics"=> ["two_hour_value_mmol_L"],
+                    "ontology_term_code" => "9414007",
+                    "name"               => "Impaired Glucose Tolerance",
+                    "present"            => true,
+                    "confidence"         => igt_conf,
+                    "evidence"           => DISCLAIMER * " 2-hour glucose: $(round(two_hour, digits=1)) mmol/L.",
                 ))
             end
         end
 
-        # NGT: fasting < 5.6 AND (2h < 7.8 or not OGTT)
-        ngt_fasting_conf = _confidence(fasting, 5.6, :below)
-        ngt_2h_conf      = is_ogtt ? _confidence(two_hour, 7.8, :below) : "definite"
-        ngt_conf = (ngt_fasting_conf in ["definite","borderline"] && ngt_2h_conf in ["definite","borderline"]) ?
-                    (ngt_fasting_conf == "definite" && ngt_2h_conf == "definite" ? "definite" : "borderline") :
-                    "not_applicable"
-
-        if ngt_conf in ["definite", "borderline"]
-            criteria_vals = Dict("fasting_mmol_L" => fasting)
-            if is_ogtt
-                criteria_vals["two_hour_mmol_L"] = two_hour
-            end
-            push!(diagnoses, Dict(
-                "name"              => "Normal Glucose Tolerance",
-                "code"              => "NGT",
-                "category"          => "glucose_tolerance",
-                "ontology_ref"      => "diagnoses.glucose_tolerance.NGT",
-                "confidence"        => ngt_conf,
-                "disclaimer"        => DISCLAIMER,
-                "criteria_values"   => criteria_vals,
-                "supporting_metrics"=> ["fasting_mmol_L", is_ogtt ? "two_hour_value_mmol_L" : nothing],
-            ))
-        end
     end
 
     # -----------------------------------------------------------------------
     # 2. Insulin resistance (HOMA-IR)
     # -----------------------------------------------------------------------
-    if homa_ir > 3.0 * 1.1   # clearly > 3.0
-        ir_code = "Insulin_Resistant"
+    if homa_ir > 3.0 * 1.1
+        ir_code = "HDT-DIAG-INSULIN-RESISTANCE"
         ir_name = "Insulin Resistance"
         ir_conf = "definite"
-    elseif homa_ir > 3.0 * 0.9   # borderline around 3.0
-        ir_code = "Insulin_Resistant"
+    elseif homa_ir > 3.0 * 0.9
+        ir_code = "HDT-DIAG-INSULIN-RESISTANCE"
         ir_name = "Insulin Resistance"
         ir_conf = "borderline"
     elseif homa_ir > 2.0 * 1.1
-        ir_code = "Borderline_IR"
+        ir_code = "HDT-DIAG-BORDERLINE-IR"
         ir_name = "Borderline Insulin Resistance"
         ir_conf = "definite"
     elseif homa_ir > 2.0 * 0.9
-        ir_code = "Borderline_IR"
+        ir_code = "HDT-DIAG-BORDERLINE-IR"
         ir_name = "Borderline Insulin Resistance"
         ir_conf = "borderline"
     else
-        ir_code = "Normal_IR"
-        ir_name = "Normal Insulin Sensitivity"
-        ir_conf = _confidence(homa_ir, 2.0, :below) == "not_applicable" ? "definite" :
-                   _confidence(homa_ir, 2.0, :below)
-        ir_conf = "definite"  # clearly below 2.0
+        ir_code = nothing
+        ir_name = ""
+        ir_conf = ""
     end
 
-    push!(diagnoses, Dict(
-        "name"              => ir_name,
-        "code"              => ir_code,
-        "category"          => "insulin_resistance",
-        "ontology_ref"      => "diagnoses.insulin_resistance.$(ir_code)",
-        "confidence"        => ir_conf,
-        "disclaimer"        => DISCLAIMER,
-        "criteria_values"   => Dict("homa_ir" => homa_ir),
-        "supporting_metrics"=> ["homa_ir"],
-    ))
+    if ir_code !== nothing
+        push!(diagnoses, Dict(
+            "ontology_term_code" => ir_code,
+            "name"               => ir_name,
+            "present"            => true,
+            "confidence"         => ir_conf,
+            "evidence"           => DISCLAIMER * " HOMA-IR: $(round(homa_ir, digits=2)).",
+        ))
+    end
 
     # -----------------------------------------------------------------------
     # 3. Beta-cell function (insulinogenic index) — OGTT only
     # -----------------------------------------------------------------------
     if is_ogtt && ii !== nothing
         if ii >= 0.4 * 0.9
-            bcf_code = "Normal_BCF"
-            bcf_name = "Normal Beta-cell Function"
-            bcf_conf = ii >= 0.4 * 1.1 ? "definite" : "borderline"
+            bcf_code = nothing
+            bcf_name = ""
+            bcf_conf = ""
         elseif ii >= 0.2 * 0.9
-            bcf_code = "Reduced_BCF"
+            bcf_code = "HDT-DIAG-REDUCED-BCF"
             bcf_name = "Reduced Beta-cell Function"
             bcf_conf = (ii < 0.4 * 1.1 && ii > 0.2 * 0.9) ? "definite" : "borderline"
         else
-            bcf_code = "Impaired_BCF"
+            bcf_code = "HDT-DIAG-IMPAIRED-BCF"
             bcf_name = "Impaired Beta-cell Function"
             bcf_conf = ii < 0.2 * 0.9 ? "definite" : "borderline"
         end
 
-        push!(diagnoses, Dict(
-            "name"              => bcf_name,
-            "code"              => bcf_code,
-            "category"          => "beta_cell_function",
-            "ontology_ref"      => "diagnoses.beta_cell_function.$(bcf_code)",
-            "confidence"        => bcf_conf,
-            "disclaimer"        => DISCLAIMER,
-            "criteria_values"   => Dict("insulinogenic_index" => ii),
-            "supporting_metrics"=> ["insulinogenic_index"],
-        ))
-    end
-
-    # -----------------------------------------------------------------------
-    # 4. Glycemic control (TIR) — CGM only
-    # -----------------------------------------------------------------------
-    if scenario == "cgm"
-        if tir >= 70.0 * 0.9
-            gc_code = "Good_Control"
-            gc_name = "Good Glycemic Control"
-            gc_conf = tir >= 70.0 * 1.1 ? "definite" : "borderline"
-        elseif tir >= 50.0 * 0.9
-            gc_code = "Suboptimal_Control"
-            gc_name = "Suboptimal Glycemic Control"
-            gc_conf = (tir < 70.0 * 1.1 && tir > 50.0 * 0.9) ? "definite" : "borderline"
-        else
-            gc_code = "Poor_Control"
-            gc_name = "Poor Glycemic Control"
-            gc_conf = tir < 50.0 * 0.9 ? "definite" : "borderline"
-        end
-
-        push!(diagnoses, Dict(
-            "name"              => gc_name,
-            "code"              => gc_code,
-            "category"          => "glycemic_control",
-            "ontology_ref"      => "diagnoses.glycemic_control.$(gc_code)",
-            "confidence"        => gc_conf,
-            "disclaimer"        => DISCLAIMER,
-            "criteria_values"   => Dict("time_in_range_percent" => tir),
-            "supporting_metrics"=> ["time_in_range_3p9_to_10_percent"],
+        bcf_code !== nothing && push!(diagnoses, Dict(
+            "ontology_term_code" => bcf_code,
+            "name"               => bcf_name,
+            "present"            => true,
+            "confidence"         => bcf_conf,
+            "evidence"           => DISCLAIMER * " Insulinogenic index: $(round(ii, digits=3)).",
         ))
     end
 
     return diagnoses
+end
+
+# ---------------------------------------------------------------------------
+# Advices — derived from active diagnoses, matched to ontology triggers
+# ---------------------------------------------------------------------------
+
+function compute_advices(diagnoses::Vector)
+    active_codes = Set(d["ontology_term_code"] for d in diagnoses if get(d, "present", false))
+    advices = Dict[]
+
+    if "9414007" in active_codes
+        push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-MONITOR-GLUCOSE",   "name" => "Increase Glucose Monitoring Frequency", "present" => true))
+        push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-INCREASE-ACTIVITY", "name" => "Increase Physical Activity",             "present" => true))
+    end
+    if "44054006" in active_codes
+        push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-REDUCE-CARBS",      "name" => "Reduce Carbohydrate Intake",             "present" => true))
+        push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-CONSULT-HCP",       "name" => "Consult Healthcare Provider",            "present" => true))
+    end
+    if "HDT-DIAG-INSULIN-RESISTANCE" in active_codes
+        push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-LIFESTYLE-IR",      "name" => "Lifestyle Intervention for Insulin Resistance", "present" => true))
+    end
+    if "HDT-DIAG-IMPAIRED-BCF" in active_codes
+        push!(advices, Dict("ontology_term_code" => "HDT-ADVICE-BETA-CELL-FOLLOWUP","name" => "Beta-cell Function Follow-up",           "present" => true))
+    end
+
+    return advices
 end
