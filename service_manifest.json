@@ -1,0 +1,64 @@
+{
+  "service_id": "edes-diabetes-assessment",
+  "name": "EDES Diabetes Assessment",
+  "version": "2.0.4",
+  "description": "Single-step OGTT glucose-insulin assessment using the EDES v2.0.4 model. Fits individual metabolic parameters to joint OGTT data and outputs simulated glucose/insulin trajectories, fitted parameters, and clinical risk classifications (glucose tolerance, insulin resistance, beta-cell function).",
+  "ontology_version_tag": "EDES-HDT-2.0.0",
+  "workflow_definition": {
+    "class": "Workflow",
+    "cwlVersion": "HDT-CWL-1.1",
+    "label": "EDES OGTT Diabetes Assessment",
+    "doc": "Single-step pipeline that accepts OGTT glucose and insulin time series, runs the EDES ODE model (ogtt4 scenario), and returns simulated trajectories, fitted metabolic parameters, and clinical risk classifications.",
+    "inputs": {
+      "scenario":          {"type": "string", "ontologyTermCode": "HDT-EDES-SCENARIO", "doc": "EDES scenario selector; ogtt4 only in v2.0.0"},
+      "plasma_glucose":    {"type": "object", "ontologyTermCode": "14749-6",           "doc": "OGTT plasma glucose time series {timestamps_min, values} in mmol/L"},
+      "fasting_insulin":   {"type": "float",  "ontologyTermCode": "20448-7",           "doc": "Fasting plasma insulin baseline in mU/L"},
+      "body_weight":       {"type": "float",  "ontologyTermCode": "29463-7",           "doc": "Patient body weight in kg"},
+      "pretrained_params": {"type": "object", "ontologyTermCode": "HDT-EDES-PARAMS",   "doc": "Optional pre-fitted parameters {k1,k5,k6,k8,sigma_g,sigma_i}; skips optimisation if provided"},
+      "plasma_insulin":    {"type": "object", "ontologyTermCode": "HDT-EDES-INSULIN",  "doc": "OGTT plasma insulin time series {timestamps_min, values} in mU/L; required for ogtt4"}
+    },
+    "outputs": {
+      "plasma_glucose_sim":        {"type": "object",  "outputSource": "edes_model/plasma_glucose_sim",        "ontologyTermCode": "HDT-EDES-PLASMA-GLUCOSE"},
+      "plasma_insulin_sim":        {"type": "object",  "outputSource": "edes_model/plasma_insulin_sim",        "ontologyTermCode": "HDT-EDES-PLASMA-INSULIN"},
+      "gut_glucose":               {"type": "object",  "outputSource": "edes_model/gut_glucose",               "ontologyTermCode": "HDT-EDES-GUT-GLUCOSE"},
+      "interstitium_insulin":      {"type": "object",  "outputSource": "edes_model/interstitium_insulin",      "ontologyTermCode": "HDT-EDES-INTERSTITIUM-INSULIN"},
+      "fit_params":                {"type": "object",  "outputSource": "edes_model/fit_params",                "ontologyTermCode": "HDT-EDES-FIT-PARAMS"},
+      "igt":                       {"type": "boolean", "outputSource": "edes_model/igt",                       "ontologyTermCode": "9414007"},
+      "t2d_risk":                  {"type": "boolean", "outputSource": "edes_model/t2d_risk",                  "ontologyTermCode": "44054006"},
+      "elevated_fasting_glucose":  {"type": "boolean", "outputSource": "edes_model/elevated_fasting_glucose",  "ontologyTermCode": "HDT-DIAG-ELEVATED-FASTING-GLUCOSE"},
+      "normal_glucose":            {"type": "boolean", "outputSource": "edes_model/normal_glucose",            "ontologyTermCode": "HDT-DIAG-NORMAL-GLUCOSE"},
+      "insulin_resistance":        {"type": "boolean", "outputSource": "edes_model/insulin_resistance",        "ontologyTermCode": "HDT-DIAG-INSULIN-RESISTANCE"},
+      "borderline_ir":             {"type": "boolean", "outputSource": "edes_model/borderline_ir",             "ontologyTermCode": "HDT-DIAG-BORDERLINE-IR"},
+      "normal_ir":                 {"type": "boolean", "outputSource": "edes_model/normal_ir",                 "ontologyTermCode": "HDT-DIAG-NORMAL-IR"},
+      "impaired_bcf":              {"type": "boolean", "outputSource": "edes_model/impaired_bcf",              "ontologyTermCode": "HDT-DIAG-IMPAIRED-BCF"},
+      "reduced_bcf":               {"type": "boolean", "outputSource": "edes_model/reduced_bcf",               "ontologyTermCode": "HDT-DIAG-REDUCED-BCF"},
+      "normal_bcf":                {"type": "boolean", "outputSource": "edes_model/normal_bcf",                "ontologyTermCode": "HDT-DIAG-NORMAL-BCF"},
+      "consult_hcp":               {"type": "boolean", "outputSource": "edes_model/consult_hcp",               "ontologyTermCode": "HDT-ADVICE-CONSULT-HCP"},
+      "reduce_carbs":              {"type": "boolean", "outputSource": "edes_model/reduce_carbs",              "ontologyTermCode": "HDT-ADVICE-REDUCE-CARBS"},
+      "increase_activity":         {"type": "boolean", "outputSource": "edes_model/increase_activity",         "ontologyTermCode": "HDT-ADVICE-INCREASE-ACTIVITY"},
+      "monitor_glucose":           {"type": "boolean", "outputSource": "edes_model/monitor_glucose",           "ontologyTermCode": "HDT-ADVICE-MONITOR-GLUCOSE"},
+      "lifestyle_ir":              {"type": "boolean", "outputSource": "edes_model/lifestyle_ir",              "ontologyTermCode": "HDT-ADVICE-LIFESTYLE-IR"},
+      "beta_cell_followup":        {"type": "boolean", "outputSource": "edes_model/beta_cell_followup",        "ontologyTermCode": "HDT-ADVICE-BETA-CELL-FOLLOWUP"}
+    },
+    "steps": {
+      "edes_model": {
+        "run": "edes-universal:2.0.4",
+        "in": {
+          "scenario":          "scenario",
+          "plasma_glucose":    "plasma_glucose",
+          "fasting_insulin":   "fasting_insulin",
+          "body_weight":       "body_weight",
+          "pretrained_params": "pretrained_params",
+          "plasma_insulin":    "plasma_insulin"
+        },
+        "out": [
+          "plasma_glucose_sim", "plasma_insulin_sim", "gut_glucose", "interstitium_insulin", "fit_params",
+          "igt", "t2d_risk", "elevated_fasting_glucose", "normal_glucose",
+          "insulin_resistance", "borderline_ir", "normal_ir",
+          "impaired_bcf", "reduced_bcf", "normal_bcf",
+          "consult_hcp", "reduce_carbs", "increase_activity", "monitor_glucose", "lifestyle_ir", "beta_cell_followup"
+        ]
+      }
+    }
+  }
+}

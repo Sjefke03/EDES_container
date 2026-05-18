@@ -9,7 +9,7 @@
       "system": "LOINC",
       "name": "Plasma Glucose Time Series",
       "description": "Oral glucose tolerance test (OGTT) plasma glucose measurements over time.",
-      "data_type": "TimeSeries",
+      "data_type": "TIME_SERIES",
       "unit": "mmol/L",
       "required": true,
       "format": { "timestamps_min": "array of float", "values": "array of float" }
@@ -20,7 +20,7 @@
       "system": "LOINC",
       "name": "Plasma Insulin Time Series",
       "description": "Plasma insulin measurements. For ogtt3/ogtt4: time series format {timestamps_min, values}. For cgm: scalar format {value: float} representing fasting baseline insulin.",
-      "data_type": "TimeSeries",
+      "data_type": "TIME_SERIES",
       "unit": "mU/L",
       "required": true,
       "format": { "timestamps_min": "array of float", "values": "array of float" }
@@ -31,7 +31,7 @@
       "system": "LOINC",
       "name": "Body Weight",
       "description": "Patient body weight used to scale volume of distribution parameters.",
-      "data_type": "Scalar",
+      "data_type": "SCALAR",
       "unit": "kg",
       "required": false,
       "format": { "value": "float" }
@@ -42,7 +42,7 @@
       "system": "HDT-CUSTOM",
       "name": "Oral Glucose Dose",
       "description": "Glucose load administered during an OGTT (default 75 g = 75000 mg).",
-      "data_type": "Scalar",
+      "data_type": "SCALAR",
       "unit": "mg",
       "required": false,
       "format": { "value": "float" }
@@ -53,7 +53,7 @@
       "system": "HDT-CUSTOM",
       "name": "Run Scenario",
       "description": "Selects the EDES model configuration. In v2.0.0 only 'ogtt4' (4-parameter OGTT with free k8) is supported.",
-      "data_type": "Categorical",
+      "data_type": "CATEGORICAL",
       "unit": null,
       "required": true,
       "allowed_values": ["ogtt4"]
@@ -64,7 +64,7 @@
       "system": "HDT-CUSTOM",
       "name": "Pre-Trained Parameters",
       "description": "Optional pre-fitted EDES parameter set for ogtt4. When provided, parameter optimisation is skipped. Includes free k8 parameter.",
-      "data_type": "Object",
+      "data_type": "CONCEPT",
       "unit": null,
       "required": false,
       "format": { "k1": "float", "k5": "float", "k6": "float", "k8": "float", "sigma_g": "float", "sigma_i": "float" }
@@ -75,7 +75,7 @@
       "system": "HDT-CUSTOM",
       "name": "Simulated Plasma Glucose Trajectory",
       "description": "Model-simulated plasma glucose concentration over 240 minutes following a glucose load.",
-      "data_type": "TimeSeries",
+      "data_type": "TIME_SERIES",
       "unit": "mmol/L",
       "required": true,
       "format": { "timestamps_min": "array of float", "values": "array of float" }
@@ -86,7 +86,7 @@
       "system": "HDT-CUSTOM",
       "name": "Simulated Plasma Insulin Trajectory",
       "description": "Model-simulated plasma insulin concentration over 240 minutes.",
-      "data_type": "TimeSeries",
+      "data_type": "TIME_SERIES",
       "unit": "mU/L",
       "required": true,
       "format": { "timestamps_min": "array of float", "values": "array of float" }
@@ -97,7 +97,7 @@
       "system": "HDT-CUSTOM",
       "name": "Gut Glucose Absorption",
       "description": "Model-simulated glucose mass in the gut compartment over time.",
-      "data_type": "TimeSeries",
+      "data_type": "TIME_SERIES",
       "unit": "mg",
       "required": true,
       "format": { "timestamps_min": "array of float", "values": "array of float" }
@@ -108,7 +108,7 @@
       "system": "HDT-CUSTOM",
       "name": "Interstitium Insulin",
       "description": "Model-simulated interstitial insulin concentration (remote compartment) over time.",
-      "data_type": "TimeSeries",
+      "data_type": "TIME_SERIES",
       "unit": "mU/L",
       "required": true,
       "format": { "timestamps_min": "array of float", "values": "array of float" }
@@ -119,13 +119,13 @@
       "system": "HDT-CUSTOM",
       "name": "Fitted or Used Model Parameters",
       "description": "EDES parameter values used for the simulation — either optimised from data or supplied as pre-trained inputs. Includes free k8 for ogtt4.",
-      "data_type": "Object",
+      "data_type": "CONCEPT",
       "unit": null,
       "required": true,
       "format": { "k1": "float", "k5": "float", "k6": "float", "k8": "float", "sigma_g": "float", "sigma_i": "float" }
     },
     {
-      "type": "DIAGNOSIS",
+      "type": "OUTPUT",
       "ontology_term_code": "9414007",
       "system": "SNOMED-CT",
       "name": "Impaired Glucose Tolerance",
@@ -136,7 +136,7 @@
       "required": false
     },
     {
-      "type": "DIAGNOSIS",
+      "type": "OUTPUT",
       "ontology_term_code": "44054006",
       "system": "SNOMED-CT",
       "name": "Type 2 Diabetes Mellitus Risk",
@@ -146,7 +146,7 @@
       "required": false
     },
     {
-      "type": "DIAGNOSIS",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-DIAG-ELEVATED-FASTING-GLUCOSE",
       "system": "HDT-CUSTOM",
       "name": "Elevated Fasting Glucose",
@@ -156,7 +156,7 @@
       "required": false
     },
     {
-      "type": "DIAGNOSIS",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-DIAG-NORMAL-GLUCOSE",
       "system": "HDT-CUSTOM",
       "name": "Normal Glucose Regulation",
@@ -165,7 +165,7 @@
       "required": false
     },
     {
-      "type": "DIAGNOSIS",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-DIAG-INSULIN-RESISTANCE",
       "system": "HDT-CUSTOM",
       "name": "Insulin Resistance",
@@ -177,7 +177,7 @@
       "required": false
     },
     {
-      "type": "DIAGNOSIS",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-DIAG-BORDERLINE-IR",
       "system": "HDT-CUSTOM",
       "name": "Borderline Insulin Resistance",
@@ -190,7 +190,7 @@
       "required": false
     },
     {
-      "type": "DIAGNOSIS",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-DIAG-NORMAL-IR",
       "system": "HDT-CUSTOM",
       "name": "Normal Insulin Sensitivity",
@@ -202,7 +202,7 @@
       "required": false
     },
     {
-      "type": "DIAGNOSIS",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-DIAG-IMPAIRED-BCF",
       "system": "HDT-CUSTOM",
       "name": "Impaired Beta-cell Function",
@@ -214,7 +214,7 @@
       "required": false
     },
     {
-      "type": "DIAGNOSIS",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-DIAG-REDUCED-BCF",
       "system": "HDT-CUSTOM",
       "name": "Reduced Beta-cell Function",
@@ -227,7 +227,7 @@
       "required": false
     },
     {
-      "type": "DIAGNOSIS",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-DIAG-NORMAL-BCF",
       "system": "HDT-CUSTOM",
       "name": "Normal Beta-cell Function",
@@ -239,7 +239,7 @@
       "required": false
     },
     {
-      "type": "ADVICE",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-ADVICE-MONITOR-GLUCOSE",
       "system": "HDT-CUSTOM",
       "name": "Increase Glucose Monitoring Frequency",
@@ -248,7 +248,7 @@
       "required": false
     },
     {
-      "type": "ADVICE",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-ADVICE-REDUCE-CARBS",
       "system": "HDT-CUSTOM",
       "name": "Reduce Carbohydrate Intake",
@@ -257,7 +257,7 @@
       "required": false
     },
     {
-      "type": "ADVICE",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-ADVICE-INCREASE-ACTIVITY",
       "system": "HDT-CUSTOM",
       "name": "Increase Physical Activity",
@@ -266,7 +266,7 @@
       "required": false
     },
     {
-      "type": "ADVICE",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-ADVICE-CONSULT-HCP",
       "system": "HDT-CUSTOM",
       "name": "Consult Healthcare Provider",
@@ -275,7 +275,7 @@
       "required": false
     },
     {
-      "type": "ADVICE",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-ADVICE-LIFESTYLE-IR",
       "system": "HDT-CUSTOM",
       "name": "Lifestyle Intervention for Insulin Resistance",
@@ -284,7 +284,7 @@
       "required": false
     },
     {
-      "type": "ADVICE",
+      "type": "OUTPUT",
       "ontology_term_code": "HDT-ADVICE-BETA-CELL-FOLLOWUP",
       "system": "HDT-CUSTOM",
       "name": "Beta-cell Function Follow-up",
